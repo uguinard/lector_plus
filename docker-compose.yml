@@ -40,7 +40,7 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
       # OpenAI-compatible backend — points at the bundled ollama service by default.
       - OPENAI_COMPAT_URL=${OPENAI_COMPAT_URL:-http://ollama:11434}
-      - OPENAI_COMPAT_MODEL=${OPENAI_COMPAT_MODEL:-llama3.1:8b}
+      - OPENAI_COMPAT_MODEL=${OPENAI_COMPAT_MODEL:-gemma4:e2b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - CLAUDE_OAUTH_TOKEN=${CLAUDE_OAUTH_TOKEN:-}
       # Background word→domain classifier that feeds the fluency radar. The
