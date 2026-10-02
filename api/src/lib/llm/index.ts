@@ -48,6 +48,23 @@ function hostedFreeUsesDeploymentConfig(): boolean {
   return process.env.LECTOR_MODE === 'cloud' && process.env.LECTOR_FREE_TIER === 'true';
 }
 
+function resolveProviderName(
+  raw: string,
+  providerSetting: (key: string) => string | null,
+): 'anthropic' | 'openai' {
+  if (raw !== 'anthropic') return 'openai';
+  // The Anthropic branch is only safe to take when at least one credential source
+  // is reachable. Probe every place the constructor reads from.
+  const storedApiKey = providerSetting('anthropicApiKey');
+  const storedOauthToken = providerSetting('claudeOauthToken');
+  if (storedApiKey || storedOauthToken) return 'anthropic';
+  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
+  if (process.env.ANTHROPIC_AUTH_TOKEN) return 'anthropic';
+  if (process.env.CLAUDE_OAUTH_TOKEN) return 'anthropic';
+  if (process.env.CLAUDE_CODE_OAUTH_TOKEN) return 'anthropic';
+  return 'openai';
+}
+
 export interface ProviderAccessOptions {
   /** Entitlement decision made for this exact operation/reservation. */
   byok: boolean;
@@ -96,7 +113,13 @@ export function getProvider(
   const raw = providerSetting('llmProvider') || process.env.LLM_PROVIDER || 'anthropic';
   // 'ollama' / 'apfel' / 'lmstudio' were separate providers; they are now one
   // OpenAI-compatible backend. Map any legacy or unknown value onto it.
-  const name = raw === 'anthropic' ? 'anthropic' : 'openai';
+  // When the configured provider is Anthropic but no Anthropic credential is
+  // reachable anywhere (no stored key, no stored OAuth token, no ANTHROPIC_API_KEY
+  // / ANTHROPIC_AUTH_TOKEN env), the SDK throws "Could not resolve authentication
+  // method" before any request goes out. Fall back to the OpenAI-compatible
+  // path so an Ollama-only local install stops exploding. Explicit credentials
+  // and the explicit 'anthropic' setting both keep their existing behaviour.
+  const name = resolveProviderName(raw, providerSetting);
 
   let cacheKey: string;
   if (name === 'anthropic') {
