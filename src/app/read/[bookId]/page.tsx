@@ -325,7 +325,13 @@ export default function ReadPage({ params }: { params: Promise<{ bookId: string 
       // Remember (or clear) the transcript segment this word came from so a
       // subsequent Anki mine can attach the timestamped source link.
       currentWordSourceRef.current = source ?? null;
-      const isPhrase = word.includes(' ');
+      // CJK has no spaces, so a multi-sentence drag or a newline-separated
+      // selection (e.g. '内容について確認しました\nチェックをする') would
+      // pass the old word.includes(' ') heuristic as a single token and then
+      // be rejected by the word-gloss server guard. Route by token count
+      // instead, so the phrase-translation path — which already accepts
+      // multi-token input — gets the right cases.
+      const isPhrase = word.trim().split(/\s+/).filter(Boolean).length > 1;
 
       // Reflect the plan's phrase-selection cap before calling the API (#222).
       // The server enforces it regardless; this just turns the over-cap case
