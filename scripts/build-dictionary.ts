@@ -227,6 +227,16 @@ interface LangProfile {
    *  loanwords like `book` and `van` — and they are not Mandarin words. An
    *  entry with no sounds at all is kept, since absence proves nothing. */
   requireSoundTag?: string;
+  /** Multi-language dump filter: skip entries whose `lang` field does not match
+   *  (en: the English Wiktionary dump is a multi-language file — filter on
+   *  `lang === "English"` to keep only English entries).
+   */
+  langFilter?: string;
+  /** Skip an entry whose own `tags` array (or any of its senses' `tags`) contains
+   *  any of these strings — used to drop form-of, proper-noun, abbreviation, and
+   *  symbol entries that kaikki indexes as full headwords (en).
+   */
+  skipEntryTags?: string[];
 
   // --- Arabic-script levers (#253). Measured against the kaikki Arabic dump;
   // --- see the comments on the `ar` profile.
@@ -503,6 +513,53 @@ const PROFILES: Record<string, LangProfile> = {
     rootsJsonRel: null,
     coverageCorpusRel: 'scripts/coverage-corpus-eo.txt',
     glossFilter: true,
+  },
+  en: {
+    // Canonical /English/ URL. The English Wiktionary dump is multi-language —
+    // each line's `lang` field names the language, and only English entries are
+    // kept (see `langFilter`).
+    kaikkiUrls: ['https://kaikki.org/dictionary/English/kaikki.org-dictionary-English.jsonl'],
+    // a-z. Apostrophe is a token boundary, matching the runtime tokenizer:
+    // English contractions like "don't" split to "don" + boundary + "t", which
+    // the exact-key miss-and-fallback handles; the apostrophe is never a word
+    // char in the lookup. Hyphen stays a word char for compounds (twenty-one).
+    letterClass: "a-zA-Z'-",
+    // No hand affix rules: English resolves through kaikki "form of <lemma>"
+    // entries + the inflections table (exact → inflections → UDPipe → AI), the
+    // same strategy as de/es/fr/nl. The pack's morphology slice (English
+    // inflection) is not wired into the coverage gate — English surface forms
+    // are mostly regular plurals and past-tense variants that kaikki carries
+    // explicitly.
+    prefixes: [],
+    suffixes: [],
+    // a e i o u, plus y. y is a vowel in many English words (gym, my, happy)
+    // but a consonant in others (yes, you); the coverage gate's simple
+    // vowel-consonant stem checks treat it as a vowel.
+    vowels: 'aeiouy',
+    rootsJsonRel: null,
+    coverageCorpusRel: 'scripts/coverage-corpus-en.txt',
+    // English Wiktionary has a large thesaurus section and non-English entries —
+    // filter those out (see `langFilter` and `skipEntryTags`).
+    glossFilter: true,
+    // Multi-language dump: keep only English entries.
+    langFilter: 'English',
+    // Skip form-of entries (inflected forms like "ran" → "go"), proper nouns
+    // (names like "London"), abbreviations, and symbols — kaikki indexes these
+    // as headwords with their own glosses, but they crowd the lookup table
+    // without adding dictionary value for a reader.
+    skipEntryTags: [
+      'form-of',
+      'alt-of',
+      'proper-noun',
+      'abbreviation',
+      'abbrev',
+      'initialism',
+      'symbol',
+      'punctuation',
+    ],
+    // Drop parts of speech that aren't useful for reading: abbreviations,
+    // symbols, punctuation. These survive the glossFilter (they have glosses).
+    skipPos: ['abbrev', 'initialism', 'punct', 'symbol'],
   },
   es: {
     // Canonical /Spanish/ URL (kaikki has no /downloads/es/ mirror).
@@ -1195,6 +1252,7 @@ interface KaikkiSound {
 }
 interface KaikkiSense {
   glosses?: string[];
+  tags?: string[];
 }
 interface KaikkiForm {
   form?: string;
@@ -1212,6 +1270,8 @@ interface KaikkiRel {
 interface KaikkiLine {
   word?: string;
   pos?: string;
+  lang?: string;
+  tags?: string[];
   etymology_text?: string;
   sounds?: KaikkiSound[];
   senses?: KaikkiSense[];
@@ -1421,6 +1481,10 @@ function foldKey(s: string): string {
 function extractEntry(raw: KaikkiLine): ExtractedEntry | null {
   if (!raw.word) return null;
 
+  // Multi-language dump filter (en: English Wiktionary dump contains entries for
+  // every language — keep only those tagged for the target language).
+  if (PROFILE.langFilter && raw.lang !== PROFILE.langFilter) return null;
+
   // Variety filter (zh). An entry with sounds[] but none tagged Mandarin is a
   // word of another Chinese variety, not a Mandarin one — 8,145 of them, mostly
   // Cantonese English loans (`book`, `van`). An entry with NO sounds at all is
@@ -1435,6 +1499,14 @@ function extractEntry(raw: KaikkiLine): ExtractedEntry | null {
   // cannot encode, so the string is a picture and never a lookup key. 10 such
   // entries reach this point in the Chinese dump.
   if (PROFILE.skipFormPattern?.test(raw.word)) return null;
+
+  // Entry-level or sense-level tag filter (en). Skip entries whose own tags or
+  // any sense tags contain a disqualifying tag (form-of, proper-noun, etc.).
+  const skipTags = PROFILE.skipEntryTags;
+  if (skipTags && skipTags.length > 0) {
+    if (raw.tags?.some((t) => skipTags.includes(t))) return null;
+    if (raw.senses?.some((s) => s.tags?.some((t) => skipTags.includes(t)))) return null;
+  }
 
   // A part of speech the pack never wants, however good the gloss. See skipPos.
   if (raw.pos && PROFILE.skipPos?.includes(raw.pos)) return null;
