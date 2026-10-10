@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-11 00:33
+
+- Add keyboard navigation to the reader article (arrows, Shift+Arrow selection, Escape, k/x/1-4 shortcuts with auto-advance).
+  - `src/components/WordCell/index.tsx`: added `blockId` and `wordIndex` props, rendered as `data-block-id` and `data-word-index` attributes for DOM-based navigation queries; added `focus-visible:ring-2` style for keyboard focus.
+  - `src/components/MarkdownReader/ReaderArticle/index.tsx`: passes `blockId` and `wordIndex` to each `WordCell`.
+  - `src/components/MarkdownReader/useReaderKeyboardNavigation.ts` (new): custom hook listening on `window` for arrow navigation, Shift+Arrow phrase selection, Escape (close drawer), 's' (save word), and k/x/1-4 state shortcuts with auto-advance.
+  - `src/components/MarkdownReader/index.tsx`: integrates the hook; added `onReaderStateShortcut`, `onReaderCloseDrawer`, `onReaderSaveWord`, `onReaderLookUpWord` props to `MarkdownReaderProps`; internally wires `onNavigate`, `onSelectPhrase`, `onClearSelection`.
+  - `src/components/MarkdownReader/types.ts`: added the four new optional callback props.
+  - `src/app/read/[bookId]/page.tsx`: added `handleStateShortcut`, `handleReaderCloseDrawer`, `handleReaderSaveWord`, `handleLookUpWord` callbacks; removed k/x/1-4/escape/s from the window-level keyboard handler (now handled by the hook with auto-advance); kept Cmd+C.
+  - `src/components/MarkdownReader/__tests__/useReaderKeyboardNavigation.test.ts` (new): 9 unit tests covering `STATE_SHORTCUTS` mapping and `parseWordElement`.
+  - `e2e/reader-keyboard-navigation.spec.ts` (new): 11 e2e tests covering arrow navigation (incl. body focus), Shift+Arrow selection, Escape, Enter lookup, state shortcuts with auto-advance, 's' save, and body/drawer focus edge cases.
+  - `e2e/reader-word-handling.spec.ts`: updated `Cmd+number` test to assert `data-word-state` attribute instead of level-button ring (auto-advance moves the drawer to the next word).
+  - Rationale: enables rapid vocabulary building — navigate and assign states without touching the mouse. The window-level listener catches keys regardless of focus (reader, body, or portaled drawer).
+  - Fix 2026-10-11 01:30: Bug fix batch — (1) Arrow navigation now uses a persistent cursor ref synced from activeWord, so arrows advance from the clicked word instead of always jumping to the first word. (2) Up/Down arrows use getBoundingClientRect geometry to follow visual line wrapping, not DOM order. (3) 'i' added as an alias for the ignore key alongside 'x'. (4) Escape now clears selection on first press and closes the drawer on second press. (5) 's' restored to original behavior (save word to vocab, not level assignment). (6) State shortcuts (k/x/i/1-4) now work from any focus (body, reader, drawer) since the listener is on `window`.
+
 ## 2026-09-30 12:55
 
 - Fix read-page handler routing multi-token CJK selections (newline-separated text, accidental multi-sentence drags) to the phrase-translation endpoint instead of failing the word-gloss server guard with `Word must be a single token` (400).

@@ -860,6 +860,39 @@ export default function ReadPage({ params }: { params: Promise<{ bookId: string 
     ],
   );
 
+  // Keyboard-navigation callbacks for the reader.
+  // k/x/1-4 dispatch to the state setters; the reader auto-advances afterwards.
+  const handleStateShortcut = useCallback(
+    async (state: WordState) => {
+      if (state === 'known') {
+        await markAsKnown();
+      } else if (state === 'ignored') {
+        await ignoreWord();
+      } else if (state.startsWith('level')) {
+        const level = parseInt(state.charAt(state.length - 1)) as 1 | 2 | 3 | 4;
+        await setWordLevel(level);
+      }
+    },
+    [markAsKnown, ignoreWord, setWordLevel],
+  );
+
+  const handleLookUpWord = useCallback(
+    (word: string) => {
+      void handleWordClick(word, '');
+    },
+    [handleWordClick],
+  );
+
+  const handleReaderCloseDrawer = useCallback(() => {
+    closeWordPanel();
+  }, [closeWordPanel]);
+
+  const handleReaderSaveWord = useCallback(() => {
+    if (!wordPanel.existingEntry && wordPanel.translation) {
+      void saveWordToVocab();
+    }
+  }, [wordPanel.existingEntry, wordPanel.translation, saveWordToVocab]);
+
   const startOnboardingPractice = useCallback(async () => {
     try {
       await updateOnboardingProgress({ currentStep: 'practice' });
@@ -1139,23 +1172,13 @@ export default function ReadPage({ params }: { params: Promise<{ bookId: string 
         e.preventDefault();
         e.stopPropagation();
         closeWordPanel();
-      } else if (key === 'k') {
-        e.preventDefault();
-        e.stopPropagation();
-        markAsKnown();
-      } else if (key === 'x') {
-        e.preventDefault();
-        e.stopPropagation();
-        ignoreWord();
       } else if (key === 's' && !wordPanel.existingEntry && wordPanel.translation) {
         e.preventDefault();
         e.stopPropagation();
         saveWordToVocab();
-      } else if (['1', '2', '3', '4'].includes(e.key) && wordPanel.translation) {
-        e.preventDefault();
-        e.stopPropagation();
-        setWordLevel(parseInt(e.key) as 1 | 2 | 3 | 4);
       }
+      // k/x/1-4 are now handled by useReaderKeyboardNavigation on the reader
+      // container, which auto-advances to the next word after assignment.
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
@@ -1166,10 +1189,7 @@ export default function ReadPage({ params }: { params: Promise<{ bookId: string 
     wordPanel.existingEntry,
     wordPanel.translation,
     closeWordPanel,
-    markAsKnown,
-    ignoreWord,
     saveWordToVocab,
-    setWordLevel,
   ]);
 
   if (isLoading) {
@@ -1303,6 +1323,10 @@ export default function ReadPage({ params }: { params: Promise<{ bookId: string 
             knownWordsMap={readerWordStates}
             prevLesson={prevLesson}
             nextLesson={nextLesson}
+            onReaderStateShortcut={handleStateShortcut}
+            onReaderCloseDrawer={handleReaderCloseDrawer}
+            onReaderSaveWord={handleReaderSaveWord}
+            onReaderLookUpWord={handleLookUpWord}
             headerAction={
               segments.length > 0 ? (
                 <button
