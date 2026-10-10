@@ -153,3 +153,46 @@ describe('dictionary accepted cache routes', () => {
     ).toEqual({ n: 0 });
   });
 });
+
+describe('dictionary hint route', () => {
+  beforeEach(reset);
+  afterEach(reset);
+
+  test('returns the top sense as a hint on a cache hit', async () => {
+    const cached = await request('alice', '/cache', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        word: 'zzhintword',
+        language: 'af',
+        senses: [
+          { partOfSpeech: 'noun', gloss: 'a test noun meaning' },
+          { partOfSpeech: 'verb', gloss: 'to test something' },
+        ],
+      }),
+    });
+    expect(cached.status).toBe(200);
+
+    const hint = await request('alice', '/hint/zzhintword?language=af');
+    expect(hint.status).toBe(200);
+    expect(await hint.json()).toEqual({
+      hint: {
+        word: 'zzhintword',
+        gloss: 'a test noun meaning',
+        partOfSpeech: 'noun',
+      },
+    });
+  });
+
+  test('returns 404 with a null hint on a miss', async () => {
+    const miss = await request('alice', '/hint/zznohintword?language=af');
+    expect(miss.status).toBe(404);
+    expect(await miss.json()).toEqual({ hint: null });
+  });
+
+  test('rejects an empty word with 400', async () => {
+    const response = await request('alice', '/hint/%20?language=af');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Word is required' });
+  });
+});

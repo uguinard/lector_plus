@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, Star } from 'lucide-react';
+import { toast } from 'sonner';
 import { DeckShuffle } from '@/components/Loaders';
 import TranslationDrawer, { TranslationDrawerSlot } from '@/components/TranslationDrawer';
 import {
@@ -21,7 +22,13 @@ import {
 import { hasAudio, speak } from '@/lib/tts';
 import { playCorrectSound, playIncorrectSound } from '@/lib/sounds';
 import { translateGloss, translateWord } from '@/lib/claude';
-import { lookupWordRemote, type ExpandedDictionaryEntry } from '@/lib/dictionary-client';
+import {
+  lookupWordRemote,
+  getHint,
+  type HintResult,
+  type ExpandedDictionaryEntry,
+  type HintResponse,
+} from '@/lib/dictionary-client';
 import { splitTrailingPunctuation } from '@/lib/words';
 import { isComposing } from '@/lib/keyboard';
 import {
@@ -114,8 +121,15 @@ export default function PracticePage() {
   const [seeded, setSeeded] = useState(false);
 
   // Translation visibility. Initialised from the "Hide translation by default"
-  // setting on mount; Alt+T toggles it live during a round.
-  const [showTranslation, setShowTranslation] = useState(true);
+  // setting on mount; Alt+T toggles it live during a round. Monolingual packs
+  // (EN→EN) default to hidden — a same-language "translation" carries no signal.
+  // Computed once: the active language pack doesn't change during a practice session.
+  const activePack = getActivePack();
+  const isMonolingual = activePack.monolingual === true;
+  const [showTranslation, setShowTranslation] = useState(() => {
+    const hide = localStorage.getItem(SETTINGS_KEYS.HIDE_TRANSLATION) === 'true';
+    return !hide && !isMonolingual;
+  });
 
   // Practice format (cloze vs dictation) and, within cloze, the answer mode.
   // Dictation ("type what you hear") requires synthesized audio — for
@@ -146,6 +160,12 @@ export default function PracticePage() {
   // Feedback state
   const [feedbackData, setFeedbackData] = useState<IFeedbackData | null>(null);
   const [hintLetters, setHintLetters] = useState(0);
+  const [definitionHint, setDefinitionHint] = useState<HintResponse | null>(null);
+  const [definitionHintLoading, setDefinitionHintLoading] = useState(false);
+  // Tracks whether the hint fetch found a definition, missed, or errored,
+  // so the UI can surface a visible message instead of failing silently.
+  type HintStatus = 'idle' | 'not-found' | 'error';
+  const [definitionHintStatus, setDefinitionHintStatus] = useState<HintStatus>('idle');
 
   // Guided onboarding is deliberately isolated from normal practice. A visit
   // without ?onboarding=1 keeps the existing setup and round behaviour.
@@ -209,8 +229,12 @@ export default function PracticePage() {
         }
       }
 
-      // Respect the "hide translation by default" setting (Alt+T toggles live)
-      setShowTranslation(localStorage.getItem(SETTINGS_KEYS.HIDE_TRANSLATION) !== 'true');
+      // Respect the "hide translation by default" setting (Alt+T toggles live).
+      // Monolingual packs (EN→EN) hide translation regardless — a same-language
+      // "translation" carries no signal.
+      setShowTranslation(
+        localStorage.getItem(SETTINGS_KEYS.HIDE_TRANSLATION) !== 'true' && !isMonolingual,
+      );
 
       await migrateClozeSentences();
       await seedSentenceBank();
@@ -354,6 +378,9 @@ export default function PracticePage() {
       setFeedbackData(null);
       setDictationResult(null);
       setHintLetters(0);
+      setDefinitionHint(null);
+      setDefinitionHintLoading(false);
+      setDefinitionHintStatus('idle');
       setMcFallback(false);
       setWordTooltip(null);
       submittingRef.current = false;
@@ -513,6 +540,48 @@ export default function PracticePage() {
     setUserAnswer(correctWord.slice(0, revealCount).join(''));
     inputRef.current?.focus();
   }, [current, hintLetters, userAnswer]);
+
+  // Fetch a one-sense definition hint for the blanked word. Only the definition
+  // is revealed — not the word itself — so the learner still has to supply it.
+  const handleDefinitionHint = useCallback(async () => {
+    if (!current || definitionHintLoading) return;
+    setDefinitionHintLoading(true);
+    setDefinitionHintStatus('idle');
+    try {
+      const result = await getHint(current.sentence.clozeWord);
+      if (result.ok) {
+        setDefinitionHint(result.hint);
+        setDefinitionHintStatus('idle');
+      } else if (result.reason === 'not-found') {
+        setDefinitionHint(null);
+        setDefinitionHintStatus('not-found');
+      } else {
+        setDefinitionHint(null);
+        setDefinitionHintStatus('error');
+        toast.error('Could not fetch the definition — check your connection and try again.');
+      }
+    } catch (err) {
+      console.warn(`Definition hint failed for "${current.sentence.clozeWord}":`, err);
+      setDefinitionHint(null);
+      setDefinitionHintStatus('error');
+    } finally {
+      setDefinitionHintLoading(false);
+    }
+  }, [current, definitionHintLoading]);
+
+  // Monolingual packs (EN→EN) default to showing a definition hint on each new
+  // question — a same-language "translation" is meaningless but a word's own
+  // definition is the primary study aid. Fires once per question (keyed on id).
+  useEffect(() => {
+    if (!isMonolingual || !current || definitionHint !== null || definitionHintLoading) return;
+    void handleDefinitionHint();
+  }, [
+    current?.sentence?.id,
+    isMonolingual,
+    definitionHint,
+    definitionHintLoading,
+    handleDefinitionHint,
+  ]);
 
   // Record a completed cloze answer: decide the mastery and points, then show
   // feedback. Shared by typed answers and multiple choice — the only
@@ -1176,6 +1245,7 @@ export default function PracticePage() {
                               <>
                                 {practiceMode === 'type' && !mcFallback ? (
                                   <input
+                                    key={`blank-input-${current.sentence.id}`}
                                     ref={inputRef}
                                     type="text"
                                     value={userAnswer}
@@ -1196,14 +1266,15 @@ export default function PracticePage() {
                                     placeholder="..."
                                     dir={getActivePack().script.direction}
                                     lang={getActivePack().script.bcp47}
-                                    className={`inline-block w-32 rounded-lg border-2 px-2 py-1 text-center text-xl font-medium transition-all outline-none focus:ring-2 focus:ring-offset-1 ${inputColorClass} ${fuzzyStatus === 'match' ? 'text-primary focus:ring-ring' : ''} ${fuzzyStatus === 'partial' ? 'text-primary focus:ring-ring' : ''} ${fuzzyStatus === 'wrong' ? 'text-destructive focus:ring-destructive' : ''} ${fuzzyStatus === 'empty' ? 'text-foreground focus:ring-ring' : ''} `}
+                                    className={`inline-block w-32 rounded-lg border-2 px-2 py-1 text-center text-xl font-medium transition-colors outline-none focus:ring-2 focus:ring-offset-1 ${inputColorClass} ${fuzzyStatus === 'match' ? 'text-primary focus:ring-ring' : ''} ${fuzzyStatus === 'partial' ? 'text-primary focus:ring-ring' : ''} ${fuzzyStatus === 'wrong' ? 'text-destructive focus:ring-destructive' : ''} ${fuzzyStatus === 'empty' ? 'text-foreground focus:ring-ring' : ''} `}
                                     style={{
                                       minWidth: `${Math.max(graphemeLength(clozeBase) * 0.7, 4)}ch`,
                                     }}
                                   />
                                 ) : (
                                   <span
-                                    className="inline-block rounded-lg border-2 border-[var(--clay)] bg-[color-mix(in_srgb,var(--clay)_14%,var(--card))] px-3 py-1 text-center text-xl font-bold text-foreground"
+                                    key={`blank-span-${current.sentence.id}`}
+                                    className="inline-block rounded-lg border-2 border-[var(--clay)] bg-[color-mix(in_srgb,var(--clay)_14%,var(--card))] px-3 py-1 text-center text-xl font-bold text-foreground transition-none"
                                     style={{
                                       minWidth: `${Math.max(graphemeLength(clozeBase) * 0.7, 4)}ch`,
                                     }}
@@ -1314,39 +1385,77 @@ export default function PracticePage() {
 
                     {/* Type mode buttons */}
                     {practiceMode === 'type' && !mcFallback && (
-                      <div className="flex justify-center gap-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => {
-                            if (!current) return;
-                            generateMcOptionsForSentence(current.sentence, queue);
-                            setMcFallback(true);
-                          }}
-                          title="Switch to multiple choice for this question"
-                        >
-                          Multiple Choice
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={handleHint}
-                          title="Reveal next letter"
-                        >
-                          Hint (
-                          {hintLetters > 0
-                            ? `${hintLetters} letter${hintLetters > 1 ? 's' : ''}`
-                            : '?'}
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        {definitionHint ? (
+                          <div
+                            data-testid="definition-hint"
+                            className="rounded-md border border-border bg-card px-4 py-2 text-sm"
+                          >
+                            <span className="font-medium text-muted-foreground">
+                              {definitionHint.partOfSpeech
+                                ? `${definitionHint.partOfSpeech}: `
+                                : ''}
+                              {definitionHint.gloss}
+                            </span>
+                          </div>
+                        ) : (
+                          definitionHintStatus === 'not-found' && (
+                            <div
+                              data-testid="hint-not-found"
+                              className="text-sm text-muted-foreground italic"
+                            >
+                              No definition available for this word.
+                            </div>
                           )
-                        </Button>
-                        <Button
-                          type="button"
-                          size="lg"
-                          onClick={handleSubmit}
-                          disabled={!userAnswer.trim()}
-                        >
-                          {fuzzyStatus === 'match' ? 'Submit' : 'Check'}
-                        </Button>
+                        )}
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              if (!current) return;
+                              generateMcOptionsForSentence(current.sentence, queue);
+                              setMcFallback(true);
+                            }}
+                            title="Switch to multiple choice for this question"
+                          >
+                            Multiple Choice
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleHint}
+                            title="Reveal next letter"
+                            disabled={definitionHint !== null}
+                          >
+                            Hint (
+                            {hintLetters > 0
+                              ? `${hintLetters} letter${hintLetters > 1 ? 's' : ''}`
+                              : '?'}
+                            )
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleDefinitionHint}
+                            title="Show definition"
+                            disabled={
+                              definitionHint !== null ||
+                              definitionHintStatus !== 'idle' ||
+                              definitionHintLoading
+                            }
+                          >
+                            💡{definitionHintLoading ? ' …' : ''}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="lg"
+                            onClick={handleSubmit}
+                            disabled={!userAnswer.trim()}
+                          >
+                            {fuzzyStatus === 'match' ? 'Submit' : 'Check'}
+                          </Button>
+                        </div>
                       </div>
                     )}
 

@@ -76,7 +76,91 @@
   - Cloze targets include all content words — high-frequency ones like "the",
     "and", "in", "with" are intentionally included per user preference.
 
-- Register `en` in the `SENTENCE_BANKS` map in `api/src/routes/cloze.ts`.
+  - Register `en` in the `SENTENCE_BANKS` map in `api/src/routes/cloze.ts`.
   - Added `en: () => import('../lib/sentence-bank-en.json')` alphabetically
     between `el` and `eo`, following the same lazy-import pattern as all other
     languages.
+
+## 2026-10-10 15:35
+
+- Add `GET /api/dictionary/hint/:word` endpoint for cloze practice definition hints.
+  - `api/src/routes/dictionary.ts`: new route calls `lookupWord()` and returns the
+    single best sense as `{ hint: { word, gloss, partOfSpeech } }`, or 404 with
+    `{ hint: null }` on a miss. Empty/blank word returns 400.
+  - `api/src/lib/openapi/annotations.ts`: added `GET /api/dictionary/hint/{word}`
+    operation doc with `HintResponse` schema (word, gloss, nullable partOfSpeech).
+  - `api/openapi.json`: regenerated (103 endpoints).
+  - Rationale: the existing `/lookup` returns all senses + related forms — too much
+    information for a hint button. The hint distils to one gloss so the learner must
+    still supply the word.
+  - Risks: low — GET with word in path; practice cloze targets are not personal data.
+    Hint button disabled after reveal to prevent repeated use.
+
+- Add `getHint()` client function and 💡 "Show Definition" button to practice page.
+  - `src/lib/dictionary-client.ts`: added `getHint(word: string)` caller +
+    `HintResponse` interface `{ word, gloss, partOfSpeech }`.
+  - `src/app/practice/page.tsx`: added `definitionHint`/`definitionHintLoading`
+    state, `handleDefinitionHint` callback, hint display above type-mode buttons.
+    Hint and letter-hint buttons are both disabled once a definition hint is shown.
+    State resets in `prepareSentence`.
+  - `api/src/routes/dictionary.test.ts`: added 3 tests — cache hit returns top
+    sense, cache miss returns 404 with null hint, empty word returns 400.
+  - Note: `usedHint` tracking is client-side only — no DB column added (Free plan
+    takeout budget margin is < 170 KiB; a per-sentence boolean would exceed it).
+
+- Update stale `free-takeout-budget.test.ts` expected byte count for the `en` pack.
+  - `api/src/lib/free-takeout-budget.test.ts`: expected `totalBytes` updated from
+    `93_302_998` to `93_303_474` (the test comment predicts "~466 bytes per language
+    pack"; the actual delta from `en` is ~476 bytes, consistent with that projection).
+  - Rationale: this failure was pre-existing on the branch (the `en` language pack
+    was registered in `languages/registry.ts` before this session began).
+  - Risks: none — the assertion still enforces `totalBytes <= FREE_RESTORE_ENVELOPE`
+    and a > 1 MiB margin on the 90 MiB Free envelope.
+
+## 2026-10-10 15:45
+
+- Fix monolingual-aware defaults for the 💡 definition hint and translation toggle.
+  - `src/lib/dictionary-client.ts`: `getHint()` return type changed from
+    `HintResponse | null` to a `HintResult` discriminated union that
+    distinguishes `{ ok: true, hint }` from `{ ok: false, reason: 'not-found' | 'error' }`.
+  - `src/app/practice/page.tsx`:
+    - Computed `isMonolingual` from `getActivePack().monolingual`.
+    - On mount and in `init()` effect: for monolingual packs, `showTranslation`
+      defaults to `false` (EN→EN translation is meaningless). Non-monolingual
+      packs keep the existing behavior.
+    - Added `definitionHintStatus` state (`'idle' | 'not-found' | 'error'`).
+    - Added `useEffect` that auto-fires `getHint` on each new question for
+      monolingual packs (definition defaults to ON). Keyed on `current.sentence.id`.
+    - Shows a visible "No definition available for this word." message (with
+      `data-testid="hint-not-found"`) when the hint lookup 404s, instead of
+      failing silently. Error toasts on transport failures.
+    - The 💡 button already showed "…" while loading; now also disabled when
+      `definitionHintStatus !== 'idle'` (prevents re-clicks after a miss).
+    - Failed lookups are logged to `console.warn` with the word and language.
+  - Rationale: previously the 💡 button appeared dead on words not in the
+    dictionary; now it always gives feedback. Monolingual packs (English EN→EN)
+    benefit from a definition hint by default and don't need a foreign translation.
+  - Risks: monolingual auto-hint adds one SQLite read per question (no AI call
+    on miss, so cost is negligible). The endpoint already resolves the active
+    language via `getActiveLanguage()` — no hardcoded default was found.
+
+- Fix blank input animation (grow-and-snap) triggered by state changes on practice page.
+  - `src/app/practice/page.tsx`: replaced `transition-all` with `transition-colors`
+    on the type-mode input (prevents width/min-width transitions from firing on
+    every `inputColorClass` or `fuzzyStatus` change). Added stable `key` attributes
+    (`blank-input-${id}` / `blank-span-${id}`) tied to the question id. Added
+    `transition-none` to the MC-mode blank span.
+  - Rationale: `transition-all` animated every CSS property change, so clicking
+    💡 or Hint caused the blank to briefly resize before settling — jarring and
+    wasteful. `transition-colors` limits animation to color-only.
+
+- Fix `TypeError: sentences.map is not a function` crash in cloze data layer.
+  - `src/lib/data-layer.ts`: added `Array.isArray(sentences)` guards to all six
+    cloze-sentence fetch functions (`getClozeSentencesByCollection`,
+    `getNewSentencesByCollection`, `getClozeSentencesDueForReview`,
+    `getAllClozeSentences`, `getClozeSentencesForWord`, `getOnboardingCloze`).
+    When the API returns an error JSON object (e.g. 401/429) instead of an array,
+    these now return `[]` instead of crashing.
+  - Rationale: the crash occurred because `apiFetch` returns the raw Response
+    even for error statuses, and callers called `res.json().map()` without
+    checking. The defensive guard degrades gracefully to an empty sentence list.

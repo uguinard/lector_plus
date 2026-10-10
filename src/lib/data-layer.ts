@@ -815,6 +815,7 @@ export async function saveClozeSentence(sentence: ClozeSentence): Promise<string
 export async function getClozeSentencesDueForReview(limit: number = 20): Promise<ClozeSentence[]> {
   const res = await apiFetch(`/api/cloze/due?limit=${limit}${langParam('&')}`);
   const sentences = await res.json();
+  if (!Array.isArray(sentences)) return [];
   return sentences.map((s: Record<string, unknown>) => ({
     ...s,
     nextReview: new Date(s.nextReview as string),
@@ -843,6 +844,7 @@ export async function updateClozeAfterReview(
 export async function getAllClozeSentences(): Promise<ClozeSentence[]> {
   const res = await apiFetch(`/api/cloze${langParam()}&limit=10000`);
   const sentences = await res.json();
+  if (!Array.isArray(sentences)) return [];
   return sentences.map((s: Record<string, unknown>) => ({
     ...s,
     nextReview: new Date(s.nextReview as string),
@@ -865,6 +867,7 @@ export async function getClozeSentenceByTatoebaId(
 export async function getClozeSentencesForWord(word: string): Promise<ClozeSentence[]> {
   const res = await apiFetch(`/api/cloze${langParam()}&word=${encodeURIComponent(word)}`);
   const sentences = await res.json();
+  if (!Array.isArray(sentences)) return [];
   return sentences.map((s: Record<string, unknown>) => ({
     ...s,
     nextReview: new Date(s.nextReview as string),
@@ -930,6 +933,7 @@ export async function getClozeSentencesByCollection(
   params.set('language', getActiveLanguage());
   const res = await apiFetch(`/api/cloze/due?${params}`);
   const sentences = await res.json();
+  if (!Array.isArray(sentences)) return [];
   return sentences.map((s: Record<string, unknown>) => ({
     ...s,
     nextReview: new Date(s.nextReview as string),
@@ -954,6 +958,7 @@ export async function getNewSentencesByCollection(
   params.set('language', getActiveLanguage());
   const res = await apiFetch(`/api/cloze/due?${params}`);
   const sentences = await res.json();
+  if (!Array.isArray(sentences)) return [];
   return sentences.map((s: Record<string, unknown>) => ({
     ...s,
     nextReview: new Date(s.nextReview as string),
@@ -1327,6 +1332,7 @@ export async function getOnboardingCloze(vocabIds: string[]): Promise<ClozeSente
   const res = await apiFetch(`/api/cloze/onboarding?${params}`);
   if (!res.ok) return [];
   const sentences = await res.json();
+  if (!Array.isArray(sentences)) return [];
   return sentences.map((sentence: Record<string, unknown>) => ({
     ...sentence,
     nextReview: new Date(sentence.nextReview as string),

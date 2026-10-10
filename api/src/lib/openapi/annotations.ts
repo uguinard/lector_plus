@@ -1486,6 +1486,46 @@ const practiceOps: Record<string, OperationDoc> = {
 };
 
 const dictionaryOps: Record<string, OperationDoc> = {
+  'GET /api/dictionary/hint/{word}': {
+    summary: 'Get a hint for a practice word',
+    description:
+      'Looks up the word and returns its single best sense for the hint button in cloze practice. A miss answers `404` with a null hint.',
+    tag: 'Dictionary',
+    sharedParams: LANG,
+    pathParams: { word: 'The blanked practice word.' },
+    responses: {
+      '200': {
+        description: 'The hint.',
+        schema: {
+          type: 'object',
+          properties: {
+            hint: {
+              oneOf: [
+                {
+                  type: 'object',
+                  properties: {
+                    word: { type: 'string' },
+                    gloss: { type: 'string' },
+                    partOfSpeech: { ...NULLABLE_STRING, description: 'May be empty.' },
+                  },
+                  required: ['word', 'gloss'],
+                },
+                { type: 'null' },
+              ],
+            },
+          },
+        },
+      },
+      '404': {
+        description:
+          'The word was not found in the dictionary. The client should offer the AI translate fallback or a generic message.',
+        schema: {
+          type: 'object',
+          properties: { hint: { type: 'null' } },
+        },
+      },
+    },
+  },
   'GET /api/dictionary/lookup': {
     summary: 'Look up a word',
     description:
