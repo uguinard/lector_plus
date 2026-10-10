@@ -38,3 +38,21 @@
   - Added `scripts/coverage-corpus-en.txt`: 4,911 alpha-filtered English tokens for the coverage gate.
   - Rationale: English Wiktionary's dump is multi-language (entries for every language share one file), so filtering on `lang === "English"` at the entry level is required to keep non-English headwords out of the English dictionary. The skipEntryTags filter prevents form-of and proper-noun entries from crowding the lookup table with no dictionary value.
   - Risks: The English dump is multi-GB; the streaming path handles this, but the first build will download several GB. The skipEntryTags filter may over-prune if kaikki's tag vocabulary differs from expectations; this can be tuned after a test build.
+
+## 2026-10-10 15:02
+
+- Fix `parseLangArg` to accept bare positional language argument (e.g., `build-dictionary.ts en`) in addition to `--lang en`.
+  - `scripts/build-dictionary.ts`: `parseLangArg` now checks for non-dash argv entries that match a known PROFILES key, before falling back to `af`.
+  - Rationale: the script was only invoked with `--lang` syntax internally; a bare positional argument silently fell through to the `af` default.
+  - Risks: low — only adds a new code path; `--lang` syntax unchanged.
+
+- Add English dictionary release placeholders to `dict.env`.
+  - Added `en` to the `DICT_LANGS` list (between `de` and `es`, alphabetical).
+  - Added placeholder `DICT_VERSION_EN=` and `DICT_SHA256_EN=` lines at the bottom; empty values mean `en` is not yet "published" in the pin manifest (`parseDictEnv` skips languages without both a version and sha256).
+  - Rationale: the dictionary build now produces `dictionary-en.db` successfully; the release tag and sha256 will be filled in when a release is cut.
+  - Risks: low — the `dict-pins.test.ts` suite verifies that every listed language has a valid pin, and `en` is correctly excluded until values are populated.
+
+- Successfully built English dictionary: 734,875 entries, 1,065,504 senses, 434,108 inflections, 240 MB, 98.3% coverage.
+  - `data/dictionary-en.db`: built from the 3.1 GB kaikki English dump (1,492,836 lines).
+  - 1,057 glossless entries dropped by `glossFilter`.
+  - Coverage 4,827/4,911 wordfreq tokens = 98.3%, well above the 85% threshold.

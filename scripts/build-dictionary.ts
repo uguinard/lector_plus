@@ -1074,6 +1074,10 @@ function parseLangArg(): string {
     const m = a.match(/^--lang=(.+)$/);
     if (m) return m[1];
   }
+  // Also accept a bare positional argument: `build-dictionary.ts en`
+  for (const a of argv) {
+    if (!a.startsWith('-') && PROFILES[a]) return a;
+  }
   return 'af';
 }
 
