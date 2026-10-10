@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-11 01:42
+
+- Reader sidebar layout upgrade: docked sidebar extended from `2xl` to `lg+`; mobile drawer converted from right-slide-in panel to bottom sheet (≤45vh); added click-outside-to-close; added auto-scroll of clicked word above the bottom sheet; fixed Escape two-stage conflict with page-level handler; fixed ignore button tooltip to show both `X` and `I` keys.
+  - `src/components/TranslationDrawer/slot.tsx`: breakpoint `2xl:flex` → `lg:flex`.
+  - `src/components/TranslationDrawer/index.tsx`: `docked` now `screenSize !== 'xs' && screenSize !== 'sm'` (was `=== '2xl'`); mobile drawer repositioned to `fixed inset-x-0 bottom-0 max-h-[45vh]` with `translate-y` slide animation; added `pointerdown` outside-click handler (skips `[data-testid="reader-word"]` targets); added auto-scroll effect for `[data-active-word]` above the 45vh sheet; Escape-to-close handler now active in docked mode (shadowed by hook on reader page); `idle = docked && (!rawIsOpen || !word.trim())` so docked sidebar shows empty state after close.
+  - `src/app/read/[bookId]/page.tsx`: layout `2xl:flex-row` → `lg:flex-row`; removed page-level Escape/S keyboard handlers that conflicted with the hook's two-stage Escape and auto-advance.
+  - `e2e/reader-sidebar-layout.spec.ts` (new): 5 e2e tests at 1280px (docked layout, Escape ordering) and 800px (bottom sheet, outside-click, word-switch, auto-scroll).
+  - `e2e/cloze-definitions.spec.ts`, `e2e/translation-drawer.spec.ts`, `e2e/reader-copy.spec.ts`, `e2e/reader-keyboard-navigation.spec.ts`, `e2e/reader-word-handling.spec.ts`, `e2e/nested-definitions.spec.ts`, `e2e/onboarding.spec.ts`, `e2e/practice.spec.ts`: updated assertions from `translate-x-full` / `not.toBeVisible()` to empty-state checks to match docked sidebar behavior.
+  - Rationale: the `lg` breakpoint (1024px) is the standard tablet/desktop threshold, making the sidebar usable on more screens. Bottom-sheet is the conventional mobile pattern and keeps reader content peekable. Outside-click via `pointerdown` (capture) avoids the mousedown/click race that previously prevented it.
+
 ## 2026-10-11 00:33
 
 - Add keyboard navigation to the reader article (arrows, Shift+Arrow selection, Escape, k/x/1-4 shortcuts with auto-advance).

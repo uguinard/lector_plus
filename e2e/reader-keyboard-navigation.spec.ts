@@ -152,9 +152,9 @@ test.describe('Reader keyboard navigation', () => {
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('ArrowRight');
 
-    // Drawer should not be open
+    // Drawer is docked (visible) but stays in idle state — no word looked up.
     const drawer = page.getByTestId('translation-drawer');
-    expect(await drawer.isVisible()).toBe(false);
+    await expect(drawer.getByTestId('translation-drawer-empty')).toBeVisible();
 
     // But a word should be focused (visible focus ring via data-active-word)
     const activeWords = page.locator('[data-active-word=""]');
@@ -202,9 +202,9 @@ test.describe('Reader keyboard navigation', () => {
     await page.keyboard.press('Escape');
     await expect(drawer).toBeVisible({ timeout: 3000 });
 
-    // Second Escape: should close the drawer
+    // Second Escape: should return the drawer to its idle empty state
     await page.keyboard.press('Escape');
-    await expect(drawer).not.toBeVisible({ timeout: 3000 });
+    await expect(drawer.getByTestId('translation-drawer-empty')).toBeVisible({ timeout: 3000 });
   });
 
   test('state shortcut k marks known and auto-advances', async ({ page }) => {

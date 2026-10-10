@@ -145,7 +145,7 @@ test.describe('Reader word handling', () => {
     await expect(word).not.toHaveClass(/w-new-bg/);
 
     releaseWrite();
-    await expect(drawer).toHaveClass(/translate-x-full/);
+    await expect(drawer.getByTestId('translation-drawer-empty')).toBeVisible({ timeout: 5000 });
     await expect.poll(() => knownWordsFetches).toBe(1);
   });
 

@@ -1167,30 +1167,14 @@ export default function ReadPage({ params }: { params: Promise<{ bookId: string 
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const key = e.key.toLowerCase();
-      if (key === 'escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        closeWordPanel();
-      } else if (key === 's' && !wordPanel.existingEntry && wordPanel.translation) {
-        e.preventDefault();
-        e.stopPropagation();
-        saveWordToVocab();
-      }
-      // k/x/1-4 are now handled by useReaderKeyboardNavigation on the reader
-      // container, which auto-advances to the next word after assignment.
+      // Escape and 's' are handled by useReaderKeyboardNavigation so that
+      // Escape is two-staged (clear selection, then close) and 's' auto-advances
+      // (#289 4.5). This handler only owns the copy-on-Cmd/Ctrl+C shortcut.
     };
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [
-    wordPanel.isOpen,
-    wordPanel.word,
-    wordPanel.existingEntry,
-    wordPanel.translation,
-    closeWordPanel,
-    saveWordToVocab,
-  ]);
+  }, [wordPanel.isOpen, wordPanel.word]);
 
   if (isLoading) {
     return (
@@ -1300,7 +1284,7 @@ export default function ReadPage({ params }: { params: Promise<{ bookId: string 
   );
 
   return (
-    <div className="flex h-dvh flex-col overflow-x-hidden bg-card 2xl:flex-row print:block print:h-auto print:overflow-visible">
+    <div className="flex h-dvh flex-col overflow-x-hidden bg-card lg:flex-row print:block print:h-auto print:overflow-visible">
       <div className="relative min-h-0 flex-1 overflow-hidden print:block print:h-auto print:overflow-visible">
         {listenMode && segments.length > 0 ? (
           <ListenAlong
