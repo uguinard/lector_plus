@@ -88,6 +88,13 @@ const CORPUS: Record<
     "De l' mondo venis aŭdaca knabo.",
     'Hodiaŭ estas belega tago, ankaŭ morgaŭ estos.',
   ],
+  en: [
+    'Hello! How are you today?',
+    'The quick brown fox jumps over the lazy dog.',
+    'I read a book in 1999 — it was great.',
+    "Don't you think it's a beautiful day?",
+    'The well-known author said: "To be or not to be."',
+  ],
   es: [
     '¡Hola! ¿Cómo estás?',
     'El niño comió mañana; ¿por qué no?',

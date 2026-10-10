@@ -42,6 +42,11 @@ export const EXAMPLE_PROMPTS: Record<LanguageCode, string[]> = {
     'Explain the correlative table (kiu, tiu, ĉiu, neniu…)',
     'How do word-building affixes like mal-, -ul-, and -ej- combine?',
   ],
+  en: [
+    'When do I use "a" vs "an"?',
+    "What's the difference between the present perfect and the simple past?",
+    'How do I choose between "who", "which" and "that" in a clause?',
+  ],
   es: [
     'When do I use "ser" vs "estar"?',
     'What\'s the difference between "por" and "para"?',

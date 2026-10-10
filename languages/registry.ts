@@ -18,6 +18,7 @@ import { cs } from './cs/manifest';
 import { de } from './de/manifest';
 import { el } from './el/manifest';
 import { eo } from './eo/manifest';
+import { en } from './en/manifest';
 import { es } from './es/manifest';
 import { fi } from './fi/manifest';
 import { fr } from './fr/manifest';
@@ -51,6 +52,7 @@ const MANIFESTS = {
   de,
   el,
   eo,
+  en,
   es,
   fi,
   fr,
