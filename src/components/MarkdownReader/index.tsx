@@ -361,6 +361,10 @@ export default function MarkdownReader({
         const words = phraseWords(text);
         if (words.length >= 2) {
           setHighlightedPhrase(words);
+        } else {
+          // Selection collapsed to a single word or empty — clear the
+          // phrase highlight so the visual state matches the single-word focus.
+          setHighlightedPhrase([]);
         }
       },
       onClearSelection: handleClearSelection,

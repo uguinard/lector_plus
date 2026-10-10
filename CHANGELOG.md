@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-11 02:00
+
+- Fix Shift+Arrow to extend phrase selection from a fixed anchor (like text editors) instead of restarting from the cursor on each press. Also triggers a phrase lookup in the drawer as the selection grows.
+  - `src/components/MarkdownReader/useReaderKeyboardNavigation.ts`: added `anchorRef` that captures the word position on the first Shift+Arrow press and stays fixed while the cursor extends; each subsequent Shift+Arrow rebuilds the phrase from anchor to cursor via `wordSpansBetween` and calls both `onSelectPhrase` (highlight) and `onLookUpWord` (drawer update); anchor is cleared on plain arrow, Escape, state shortcuts, and mouse click.
+  - `src/components/MarkdownReader/index.tsx`: `onSelectPhrase` callback now clears the phrase highlight when the selection collapses to a single word (so the visual state matches a plain cursor).
+
 ## 2026-10-11 01:42
 
 - Reader sidebar layout upgrade: docked sidebar extended from `2xl` to `lg+`; mobile drawer converted from right-slide-in panel to bottom sheet (≤45vh); added click-outside-to-close; added auto-scroll of clicked word above the bottom sheet; fixed Escape two-stage conflict with page-level handler; fixed ignore button tooltip to show both `X` and `I` keys.

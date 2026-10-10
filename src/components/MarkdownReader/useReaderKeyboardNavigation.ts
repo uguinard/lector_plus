@@ -127,10 +127,29 @@ export function useReaderKeyboardNavigation(
   // Persistent cursor — survives across keydowns and re-renders.
   const cursorRef = useRef<ActiveReaderWord | null>(null);
 
+  // Shift-selection anchor — set on the first Shift+Arrow, stays fixed while
+  // the cursor extends. Reset on plain arrow, Escape, state shortcuts, and
+  // any mouse click that changes activeWord.
+  const anchorRef = useRef<ActiveReaderWord | null>(null);
+
+  // Resolve an ActiveReaderWord position to its DOM element.
+  const elementAt = (pos: ActiveReaderWord | null, words: HTMLElement[]): HTMLElement | null => {
+    if (!pos) return null;
+    return (
+      words.find(
+        (w) =>
+          w.getAttribute('data-block-id') === String(pos.blockId) &&
+          w.getAttribute('data-word-index') === String(pos.wordIndex),
+      ) ?? null
+    );
+  };
+
   // Sync cursor from activeWord whenever it changes (mouse clicks, auto-advance).
+  // Also resets the shift-selection anchor so each click starts fresh.
   useEffect(() => {
     if (activeWord) {
       cursorRef.current = activeWord;
+      anchorRef.current = null;
     }
   }, [activeWord]);
 
@@ -203,15 +222,32 @@ export function useReaderKeyboardNavigation(
 
         const nextPos = parseWordElement(next);
         if (nextPos) {
+          const prevCursor = cursorRef.current;
           cursorRef.current = nextPos;
           if (event.shiftKey) {
-            const span = wordSpansBetween(currentEl, next, words);
-            const text = span
-              .map((el) => el.textContent || '')
-              .join('')
-              .trim();
-            callbacksRef.current.onSelectPhrase(text);
+            // Shift+Arrow: extend the phrase selection from a fixed anchor.
+            // On the first Shift+Arrow the anchor is the cursor position
+            // before this move (the word that was clicked or navigated to).
+            // Subsequent presses keep the anchor fixed and move only the
+            // cursor, so Shift+Right keeps right-extending the range.
+            if (!anchorRef.current) {
+              anchorRef.current = prevCursor ?? nextPos;
+            }
+            const anchorEl = elementAt(anchorRef.current, words);
+            if (anchorEl) {
+              const span = wordSpansBetween(anchorEl, next, words);
+              const text = span
+                .map((el) => el.textContent || '')
+                .join('')
+                .trim();
+              callbacksRef.current.onSelectPhrase(text);
+              if (wordPanelOpen) {
+                callbacksRef.current.onLookUpWord(text);
+              }
+            }
           } else {
+            // Plain arrow: clear the shift anchor and move the cursor.
+            anchorRef.current = null;
             callbacksRef.current.onNavigate(nextPos);
             if (wordPanelOpen) {
               callbacksRef.current.onLookUpWord(next.textContent || '');
@@ -232,6 +268,7 @@ export function useReaderKeyboardNavigation(
         if (cursorRef.current !== null) {
           // First Escape: clear the active-word/phrase highlight, keep drawer open.
           cursorRef.current = null;
+          anchorRef.current = null;
           callbacksRef.current.onClearSelection();
         } else {
           // Second Escape: close the drawer.
@@ -274,6 +311,7 @@ export function useReaderKeyboardNavigation(
             const nextPos = parseWordElement(next);
             if (nextPos) {
               cursorRef.current = nextPos;
+              anchorRef.current = null;
               callbacksRef.current.onNavigate(nextPos);
               callbacksRef.current.onLookUpWord(next.textContent || '');
             }

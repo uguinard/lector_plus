@@ -187,6 +187,81 @@ test.describe('Reader keyboard navigation', () => {
     await expect(highlighted).toHaveCount(2, { timeout: 3000 });
   });
 
+  test('Shift+ArrowRight extends the phrase with each press (anchor stays fixed)', async ({
+    page,
+  }) => {
+    const words = page.locator('[data-word-state]');
+    await words.first().click();
+
+    // First Shift+Right: selects words 0-1 (2 words)
+    await page.keyboard.press('Shift+ArrowRight');
+    let highlighted = page.locator('[data-phrase-highlighted=""]');
+    await expect(highlighted).toHaveCount(2, { timeout: 3000 });
+
+    // Second Shift+Right: extends to words 0-2 (3 words) — does NOT restart from word 1
+    await page.keyboard.press('Shift+ArrowRight');
+    highlighted = page.locator('[data-phrase-highlighted=""]');
+    await expect(highlighted).toHaveCount(3, { timeout: 3000 });
+
+    // Third Shift+Right: extends to words 0-3 (4 words)
+    await page.keyboard.press('Shift+ArrowRight');
+    highlighted = page.locator('[data-phrase-highlighted=""]');
+    await expect(highlighted).toHaveCount(4, { timeout: 3000 });
+  });
+
+  test('plain Arrow after Shift+Arrow clears the phrase selection', async ({ page }) => {
+    const words = page.locator('[data-word-state]');
+    await words.first().click();
+
+    await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('Shift+ArrowRight');
+
+    let highlighted = page.locator('[data-phrase-highlighted=""]');
+    await expect(highlighted).toHaveCount(3, { timeout: 3000 });
+
+    // Plain Arrow clears the shift-selection anchor and highlight
+    await page.keyboard.press('ArrowRight');
+    highlighted = page.locator('[data-phrase-highlighted=""]');
+    await expect(highlighted).toHaveCount(0, { timeout: 3000 });
+  });
+
+  test('Shift+ArrowLeft extends backwards from the anchor', async ({ page }) => {
+    const words = page.locator('[data-word-state]');
+    await words.nth(4).click(); // Click word at index 4
+
+    // Shift+Left: selects words 3-4 (2 words)
+    await page.keyboard.press('Shift+ArrowLeft');
+    let highlighted = page.locator('[data-phrase-highlighted=""]');
+    await expect(highlighted).toHaveCount(2, { timeout: 3000 });
+
+    // Shift+Left again: extends to words 2-4 (3 words)
+    await page.keyboard.press('Shift+ArrowLeft');
+    highlighted = page.locator('[data-phrase-highlighted=""]');
+    await expect(highlighted).toHaveCount(3, { timeout: 3000 });
+  });
+
+  test('Escape after Shift+Arrow clears highlight then returns to idle', async ({ page }) => {
+    const words = page.locator('[data-word-state]');
+    await words.first().click();
+
+    await page.keyboard.press('Shift+ArrowRight');
+    await page.keyboard.press('Shift+ArrowRight');
+
+    const drawer = page.getByTestId('translation-drawer');
+    // Drawer should be open (Shift+Arrow triggers onLookUpWord when open)
+    await expect(drawer).toBeVisible();
+
+    // First Escape: clears the phrase highlight
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-phrase-highlighted=""]')).toHaveCount(0);
+
+    // Second Escape: returns drawer to idle empty state
+    await page.keyboard.press('Escape');
+    await expect(drawer.getByTestId('translation-drawer-empty')).toBeVisible({
+      timeout: 3000,
+    });
+  });
+
   test('Escape first clears selection, then closes drawer', async ({ page }) => {
     const words = page.locator('[data-word-state]');
     await words.first().click();
