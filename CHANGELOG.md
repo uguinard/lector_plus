@@ -56,3 +56,27 @@
   - `data/dictionary-en.db`: built from the 3.1 GB kaikki English dump (1,492,836 lines).
   - 1,057 glossless entries dropped by `glossFilter`.
   - Coverage 4,827/4,911 wordfreq tokens = 98.3%, well above the 85% threshold.
+
+## 2026-10-10 15:33
+
+- Create English sentence bank generator script (`scripts/build-cloze-en.py`).
+  - Modeled after `scripts/build-cloze-it.py` but adapted for a monolingual pack:
+    uses `eng-eng_links.tsv` to find paraphrase sentences as "translations".
+  - Candidate words come from wordfreq top-N list, filtered only by dictionary
+    POS (content words: noun/adj/adv/verb/num/intj; proper nouns excluded).
+  - All content words pass through as cloze targets — no stop-word exclusion.
+  - Sentence length filtered to 5–20 words; sentences-per-word capped at 6.
+  - Downloads Tatoeba `eng_sentences.tsv.bz2` and `eng-eng_links.tsv.bz2`
+    (cached in `tmp/cloze-en/`).
+  - Prerequisites noted: requires `pip install wordfreq` and the English dict DB.
+
+- Generate English sentence bank (`api/src/lib/sentence-bank-en.json`).
+  - 8,859 rows, 1,704/2,000 candidate words covered (85.2%).
+  - Collections: top500=2,793, top1000=2,401, top2000=3,665.
+  - Cloze targets include all content words — high-frequency ones like "the",
+    "and", "in", "with" are intentionally included per user preference.
+
+- Register `en` in the `SENTENCE_BANKS` map in `api/src/routes/cloze.ts`.
+  - Added `en: () => import('../lib/sentence-bank-en.json')` alphabetically
+    between `el` and `eo`, following the same lazy-import pattern as all other
+    languages.
