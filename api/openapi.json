@@ -4303,6 +4303,137 @@
         "x-token-scope": "vocab:write"
       }
     },
+    "/api/dictionary/hint/{word}": {
+      "get": {
+        "operationId": "getApiDictionaryHintByWord",
+        "summary": "Get a hint for a practice word",
+        "description": "Looks up the word and returns its single best sense for the hint button in cloze practice. A miss answers `404` with a null hint.",
+        "tags": [
+          "Dictionary"
+        ],
+        "parameters": [
+          {
+            "name": "word",
+            "in": "path",
+            "required": true,
+            "description": "The blanked practice word.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LanguageQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The hint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hint": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "word": {
+                              "type": "string"
+                            },
+                            "gloss": {
+                              "type": "string"
+                            },
+                            "partOfSpeech": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "May be empty."
+                            }
+                          },
+                          "required": [
+                            "word",
+                            "gloss"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token does not carry the scope this endpoint needs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The word was not found in the dictionary. The client should offer the AI translate fallback or a generic message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hint": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A plan limit or a rate limit stopped the call.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanLimitError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The API failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PersonalAccessToken": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-token-scope": "vocab:read"
+      }
+    },
     "/api/dictionary/lookup": {
       "get": {
         "operationId": "getApiDictionaryLookup",

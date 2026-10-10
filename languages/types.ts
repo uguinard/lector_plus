@@ -277,6 +277,14 @@ export interface LanguageConfig {
   code: LanguageCode;
   /** Flag emoji. */
   flag: string;
+  /**
+   * True for a monolingual learnable language — e.g. English learned
+   * English-to-English — where the dictionary carries definitions in the same
+   * language rather than translations into a pivot. The dictionary builder and
+   * the lookup layer branch on this so the UI renders a same-language gloss
+   * instead of a foreign one.
+   */
+  monolingual?: boolean;
   /** Primary TTS locale, e.g. "de-DE". Required when 'google' ∈ pronunciation.audio. */
   ttsCode?: string;
   /** Preferred Google Cloud TTS voice. Required when 'google' ∈ pronunciation.audio. */

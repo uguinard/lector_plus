@@ -39,6 +39,39 @@ export function makeDictionaryRoutes(
 ) {
   const app = new Hono();
 
+  // GET /api/dictionary/hint/:word
+  // Returns a one-sense definition for the hint button in cloze practice.
+  // Unlike /lookup, which can carry many senses, the hint distils the entry to
+  // its single best gloss so the learner still has to supply the word.
+  app.get('/hint/:word', (c) => {
+    try {
+      const { word } = c.req.param();
+      if (!word || !word.trim()) {
+        return c.json({ error: 'Word is required' }, 400);
+      }
+
+      const userId = resolveUser(c);
+      const lang = resolveLanguage(c.req.query('language'), userId);
+      const entry = lookupWord(userId, word.trim(), lang);
+
+      if (!entry || entry.senses.length === 0) {
+        return c.json({ hint: null }, 404);
+      }
+
+      const sense = entry.senses[0];
+      return c.json({
+        hint: {
+          word: entry.word,
+          gloss: sense.gloss,
+          partOfSpeech: sense.partOfSpeech || null,
+        },
+      });
+    } catch (error) {
+      console.error('Dictionary hint error:', error);
+      return c.json({ error: error instanceof Error ? error.message : 'Hint failed' }, 500);
+    }
+  });
+
   // GET /api/dictionary/lookup?word=<word>
   // Returns { entry } on a hit, { entry: null } on a miss (always 200 unless the
   // input is malformed). A miss signals the caller to fall back to AI translate.

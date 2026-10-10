@@ -22,6 +22,12 @@ export interface ExpandedDictionaryEntry {
   source?: 'dict' | 'cache';
 }
 
+export interface HintResponse {
+  word: string;
+  gloss: string;
+  partOfSpeech: string | null;
+}
+
 /**
  * In-memory session cache. Map of `${language}:${lowercase word}` → entry (or
  * null for misses) — keyed by language so the same word in different target
@@ -62,6 +68,39 @@ export function invalidateLookupCache(word?: string): void {
   }
 }
 
+/**
+ * Result of a hint lookup. Distinguishes a genuine miss (404 — the word is
+ * simply not in the dictionary) from a transport/server error, so the UI
+ * can show an appropriate message instead of failing silently.
+ */
+export type HintResult =
+  | { ok: true; hint: HintResponse }
+  | { ok: false; reason: 'not-found' | 'error' };
+
+/**
+ * Fetch a one-sense hint for the blanked word in cloze practice.
+ * Falls back to the first available sense of the full dictionary entry.
+ *
+ * Returns a discriminated result so callers can tell "word not found" from
+ * "network/server error". The active language is resolved server-side from the
+ * `?language=` query parameter (read from getActiveLanguage at the call site).
+ */
+export async function getHint(word: string): Promise<HintResult> {
+  const language = getActiveLanguage();
+  const url = `/api/dictionary/hint/${encodeURIComponent(word)}?language=${encodeURIComponent(language)}`;
+  try {
+    const res = await apiFetch(url);
+    if (res.status === 404) return { ok: false, reason: 'not-found' };
+    if (!res.ok) return { ok: false, reason: 'error' };
+    const data = (await res.json().catch(() => null)) as { hint?: HintResponse | null } | null;
+    if (data?.hint) return { ok: true, hint: data.hint };
+    return { ok: false, reason: 'not-found' };
+  } catch (err) {
+    console.warn(`Hint lookup failed for "${word}" in ${language}:`, err);
+    return { ok: false, reason: 'error' };
+  }
+}
+
 export interface CacheAcceptedTranslationInput {
   word: string;
   senses: Array<{ partOfSpeech: string; gloss: string }>;
@@ -81,7 +120,9 @@ export interface CacheAcceptedTranslationInput {
  * The session lookup cache is invalidated for the word so the next click
  * re-fetches and picks up the freshly-cached entry (now with `source: 'cache'`).
  */
-export async function cacheAcceptedTranslation(input: CacheAcceptedTranslationInput): Promise<void> {
+export async function cacheAcceptedTranslation(
+  input: CacheAcceptedTranslationInput,
+): Promise<void> {
   if (!input.word || !input.senses?.length) return;
   invalidateLookupCache(input.word);
   try {
