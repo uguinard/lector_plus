@@ -550,9 +550,11 @@ app.post(
         return c.json({ error: 'vocab.state is invalid' }, 400);
       }
       let error: string | null = null;
-      for (const field of ['reviewCount', 'chapter', 'ankiNoteId'] as const) {
+      for (const field of ['reviewCount', 'chapter', 'ankiNoteId', 'srsLevel'] as const) {
         error ??= validateOptionalFiniteNumber(row, field, 'vocab');
       }
+      error ??= validateOptionalTimestamp(row, 'nextReview', 'vocab');
+      error ??= validateOptionalTimestamp(row, 'lastReview', 'vocab');
       error ??= validateOptionalTimestamp(row, 'stateUpdatedAt', 'vocab');
       error ??= validateOptionalTimestamp(row, 'createdAt', 'vocab');
       if (error) return c.json({ error }, 400);
@@ -1317,14 +1319,16 @@ app.post(
 
       if (data.vocab?.length) {
         const stmt = db.prepare(`
-      INSERT INTO vocab (id, text, type, sentence, translation, state, stateUpdatedAt, reviewCount, bookId, chapter, language, createdAt, pushedToAnki, ankiNoteId, userId)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO vocab (id, text, type, sentence, translation, state, stateUpdatedAt, reviewCount, bookId, chapter, language, createdAt, pushedToAnki, ankiNoteId, srsLevel, nextReview, lastReview, userId)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(userId, id) DO UPDATE SET
         text = excluded.text, type = excluded.type, sentence = excluded.sentence,
         translation = excluded.translation, state = excluded.state, stateUpdatedAt = excluded.stateUpdatedAt,
         reviewCount = excluded.reviewCount, bookId = excluded.bookId, chapter = excluded.chapter,
         language = excluded.language, createdAt = excluded.createdAt,
-        pushedToAnki = excluded.pushedToAnki, ankiNoteId = excluded.ankiNoteId
+        pushedToAnki = excluded.pushedToAnki, ankiNoteId = excluded.ankiNoteId,
+        srsLevel = excluded.srsLevel, nextReview = excluded.nextReview,
+        lastReview = excluded.lastReview
     `);
 
         for (const v of data.vocab) {
@@ -1343,6 +1347,9 @@ app.post(
             v.createdAt || new Date().toISOString(),
             v.pushedToAnki ? 1 : 0,
             v.ankiNoteId || null,
+            v.srsLevel ?? 0,
+            v.nextReview ?? null,
+            v.lastReview ?? null,
             userId,
           );
           results.vocab++;

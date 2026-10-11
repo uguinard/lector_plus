@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, Star } from 'lucide-react';
+import { CheckCircle, Star, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { DeckShuffle } from '@/components/Loaders';
 import TranslationDrawer, { TranslationDrawerSlot } from '@/components/TranslationDrawer';
@@ -10,13 +10,17 @@ import {
   ClozeSentence,
   ClozeMasteryLevel,
   ClozeCollection,
+  VocabEntry,
   getActivePack,
+  getActiveLanguage,
+  getDueVocabForReview,
   getClozeSentencesByCollection,
   getNewSentencesByCollection,
   getCollectionCounts,
   getOnboardingCloze,
   getTodayStats,
   migrateClozeSentences,
+  scheduleVocabReviews,
   seedSentenceBank,
 } from '@/lib/data-layer';
 import { hasAudio, speak } from '@/lib/tts';
@@ -44,6 +48,7 @@ import {
   calculateDictationPoints,
   calculatePoints,
   buildMultipleChoiceOptions,
+  buildVocabMultipleChoice,
   checkAnswer,
   diffDictation,
   getFuzzyStatus,
@@ -60,6 +65,7 @@ import type {
   RoundType,
 } from './types';
 import { useClozeRound } from './use-cloze-round';
+import { useVocabRound } from './use-vocab-round';
 import {
   COLLECTION_LABELS,
   PRACTICE_FORMAT_SETTING_KEY,
@@ -73,6 +79,7 @@ import { SETTINGS_KEYS } from '@/app/settings/constants';
 import EmptyState from './components/EmptyState';
 import PageHeader from '@/components/PageHeader';
 import Feedback from './components/Feedback';
+import { VocabFeedback } from './components/VocabFeedback';
 import DictationCard from './components/Dictation/DictationCard';
 import DictationFeedback from './components/Dictation/DictationFeedback';
 import {
@@ -114,6 +121,25 @@ export default function PracticePage() {
     blacklistCurrent,
   } = useClozeRound();
 
+  // Vocab SRS round — separate from cloze; manages its own queue of due vocab entries.
+  const {
+    state: vocabState,
+    queue: vocabQueue,
+    current: vocabCurrent,
+    roundSize: vocabRoundSize,
+    roundProgress: vocabRoundProgress,
+    roundCorrect: vocabRoundCorrect,
+    points: vocabPoints,
+    setPoints: setVocabPoints,
+    isRetryPhase: vocabIsRetryPhase,
+    beginRound: vocabBeginRound,
+    startRound: vocabStartRound,
+    commitReview: vocabCommitReview,
+    showFeedback: vocabShowFeedback,
+    advance: vocabAdvance,
+    setPhase: setVocabState,
+  } = useVocabRound();
+
   // Question-local state stays with the page and is reset explicitly whenever
   // the round controller presents a new current sentence.
   const [userAnswer, setUserAnswer] = useState('');
@@ -137,6 +163,7 @@ export default function PracticePage() {
   // unavailable and the stored format falls back to cloze.
   const dictationAvailable = hasAudio();
   const [practiceFormat, setPracticeFormat] = useState<PracticeFormat>('cloze');
+  const isVocabMode = practiceFormat === 'vocab';
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('type');
   const [roundType, setRoundType] = useState<RoundType>('new');
 
@@ -149,6 +176,12 @@ export default function PracticePage() {
   const [mcCorrectIdx, setMcCorrectIdx] = useState<number>(0);
   const [mcLocked, setMcLocked] = useState(false);
   const [mcFallback, setMcFallback] = useState(false); // Temporary MC switch from type mode
+
+  // Vocab MC state (separate from cloze MC — different distractor pool)
+  const [vocabMcOptions, setVocabMcOptions] = useState<string[]>([]);
+  const [vocabMcSelected, setVocabMcSelected] = useState<number | null>(null);
+  const [vocabMcCorrectIdx, setVocabMcCorrectIdx] = useState<number>(0);
+  const [vocabMcLocked, setVocabMcLocked] = useState(false);
 
   // Collection state
   const [selectedCollection, setSelectedCollection] = useState<ClozeCollection>('top500');
@@ -221,10 +254,14 @@ export default function PracticePage() {
           setPracticeMode(savedMode);
         }
 
-        // Load saved practice format (cloze vs dictation). A stored dictation
-        // preference is ignored for languages without synthesized audio.
+        // Load saved practice format. A stored dictation preference is ignored
+        // for languages without synthesized audio; vocab is always available.
         const savedFormat = localStorage.getItem(PRACTICE_FORMAT_SETTING_KEY);
-        if (savedFormat === 'cloze' || (savedFormat === 'dictation' && hasAudio())) {
+        if (
+          savedFormat === 'cloze' ||
+          savedFormat === 'vocab' ||
+          (savedFormat === 'dictation' && hasAudio())
+        ) {
           setPracticeFormat(savedFormat);
         }
       }
@@ -515,6 +552,97 @@ export default function PracticePage() {
   const startRound = useCallback(() => {
     startRoundWith(selectedCollection, roundType, originalRoundSize);
   }, [selectedCollection, roundType, startRoundWith, originalRoundSize]);
+
+  // Generate MC options for the current vocab entry's translation
+  const prepareVocabCard = useCallback(() => {
+    const entry = vocabCurrent;
+    if (!entry) return;
+    const poolForOptions = vocabQueue;
+    const { options, correctIndex } = buildVocabMultipleChoice(entry.translation, poolForOptions);
+    setVocabMcOptions(options);
+    setVocabMcCorrectIdx(correctIndex);
+    setVocabMcSelected(null);
+    setVocabMcLocked(false);
+  }, [vocabCurrent, vocabQueue]);
+
+  // Start a vocab SRS round — fetches due vocab entries and begins the round.
+  const startVocabRound = useCallback(
+    async (size: number) => {
+      vocabBeginRound(size);
+      setOriginalRoundSize(size as RoundSize);
+
+      try {
+        const entries = await vocabStartRound(size, undefined);
+
+        // Shuffle
+        for (let i = entries.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [entries[i], entries[j]] = [entries[j], entries[i]];
+        }
+
+        if (entries.length > 0) {
+          setVocabState('practicing');
+          prepareVocabCard();
+        } else {
+          setVocabState('empty');
+        }
+      } catch (error) {
+        console.error('Failed to start vocab round:', error);
+        setVocabState('complete');
+      }
+    },
+    [vocabBeginRound, vocabStartRound, setVocabState, prepareVocabCard],
+  );
+
+  // Handle vocab MC selection
+  const handleVocabMcSelect = useCallback(
+    (index: number) => {
+      if (vocabMcLocked || !vocabCurrent) return;
+      setVocabMcSelected(index);
+      setVocabMcLocked(true);
+
+      const isCorrect = index === vocabMcCorrectIdx;
+
+      if (isCorrect) {
+        playCorrectSound();
+      } else {
+        playIncorrectSound();
+      }
+
+      const delay = isCorrect ? 600 : 1200;
+      mcTimerRef.current = setTimeout(() => {
+        mcTimerRef.current = null;
+        void vocabCommitReview(vocabCurrent, isCorrect);
+        if (isCorrect) {
+          setVocabPoints(vocabPoints + 5);
+        }
+        vocabShowFeedback();
+      }, delay);
+    },
+    [
+      vocabMcLocked,
+      vocabCurrent,
+      vocabMcCorrectIdx,
+      mcTimerRef,
+      vocabCommitReview,
+      vocabShowFeedback,
+      vocabPoints,
+      setVocabPoints,
+    ],
+  );
+
+  // Advance to the next vocab card
+  const handleVocabNext = useCallback(() => {
+    vocabAdvance();
+    // prepareVocabCard will re-run via the useEffect watching vocabCurrent
+  }, [vocabAdvance]);
+
+  // Re-prepare vocab MC options whenever the current vocab entry changes
+  useEffect(() => {
+    if (isVocabMode && vocabState === 'practicing') {
+      prepareVocabCard();
+    }
+  }, [vocabCurrent, isVocabMode, vocabState, prepareVocabCard]);
 
   // Handle hint - reveal next letter. Grapheme-wise (#289): revealing "the
   // next character" must never split a base letter from its combining marks
@@ -902,7 +1030,17 @@ export default function PracticePage() {
     if (nextRound.current) prepareSentence(nextRound.current, nextRound.queue);
   }, [blacklistCurrent, prepareSentence]);
 
-  const progressPercent = roundSize > 0 ? Math.min((roundProgress / roundSize) * 100, 100) : 0;
+  // --- Vocab mode uses a separate round controller; switch the active set of
+  // values so the JSX below can stay format-agnostic where the flow is identical.
+  const activeState = isVocabMode ? vocabState : state;
+  const activeCurrent = isVocabMode ? vocabCurrent : current;
+  const activeRoundSize = isVocabMode ? vocabRoundSize : roundSize;
+  const activeRoundProgress = isVocabMode ? vocabRoundProgress : roundProgress;
+  const activeRoundCorrect = isVocabMode ? vocabRoundCorrect : roundCorrect;
+  const activePoints = isVocabMode ? vocabPoints : points;
+
+  const progressPercent =
+    activeRoundSize > 0 ? Math.min((activeRoundProgress / activeRoundSize) * 100, 100) : 0;
   const onboardingEncounteredCount = encounteredOnboardingTerms(onboardingSnapshot).length;
   const onboardingSavedCount = savedOnboardingWords(onboardingSnapshot).length;
   const onboardingProgress = onboardingSnapshot?.progress;
@@ -914,19 +1052,23 @@ export default function PracticePage() {
         {state === 'setup' && (
           <div className="py-6">
             <PageHeader
-              title={practiceFormat === 'dictation' ? 'Dictation Practice' : 'Cloze Practice'}
+              title={
+                practiceFormat === 'vocab'
+                  ? 'Vocab Review'
+                  : practiceFormat === 'dictation'
+                    ? 'Dictation Practice'
+                    : 'Cloze Practice'
+              }
             ></PageHeader>
 
-            {/* Practice format: Cloze (fill the blank) vs Dictation (hear the
-                sentence, type it back). Both share the collection / round size /
-                review options below. */}
+            {/* Practice format: Cloze (fill the blank), Dictation (hear the sentence,
+                 type it back), or Vocab (multiple-choice translation recall). All
+                 share the round-size control; cloze also has a Type/MC mode toggle. */}
             <div className="mb-6">
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {/* Explicit aria-labels keep each button's accessible name to
-                    just "Cloze"/"Dictation" — the descriptive subtitle stays
-                    visible but doesn't leak into role-based locators (e.g. the
-                    cloze "Type" mode button would otherwise also match the
-                    "Type what you hear" subtitle). */}
+                     just the format — the descriptive subtitle stays visible but
+                     doesn't leak into role-based locators. */}
                 <Button
                   aria-label="Cloze"
                   onClick={() => handleSetPracticeFormat('cloze')}
@@ -949,8 +1091,48 @@ export default function PracticePage() {
                     </div>
                   </Button>
                 )}
+                <Button
+                  aria-label="Vocab"
+                  onClick={() => handleSetPracticeFormat('vocab')}
+                  variant={practiceFormat === 'vocab' ? 'default' : 'secondary'}
+                  className="flex h-14 flex-col justify-center gap-0"
+                >
+                  <div>Vocab</div>
+                  <div className="mt-0.5 text-[11px] font-normal opacity-75">
+                    Review saved words
+                  </div>
+                </Button>
               </div>
             </div>
+
+            {/* Vocab setup: round-size selector + start button. */}
+            {practiceFormat === 'vocab' && (
+              <div className="mb-6 rounded-2xl border border-border bg-card p-5">
+                <h2 className="mb-4 text-base font-semibold text-foreground">Review Due</h2>
+                <div className="mb-4 flex gap-1.5">
+                  {ROUND_SIZES.map((size) => (
+                    <Button
+                      key={size}
+                      size="sm"
+                      variant={roundSize === size ? 'default' : 'secondary'}
+                      onClick={() => {
+                        setOriginalRoundSize(size);
+                        setRoundSize(size);
+                      }}
+                    >
+                      {size}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  onClick={() => startVocabRound(roundSize)}
+                  disabled={!seeded}
+                  className="w-full"
+                >
+                  {seeded ? 'Start Review' : 'Loading...'}
+                </Button>
+              </div>
+            )}
 
             {/* Review Due section — cloze only. Dictation is a focused
                 listening drill, so the SRS review reminders (a cloze-practice
@@ -1085,8 +1267,8 @@ export default function PracticePage() {
         )}
 
         {/* In-round header with progress */}
-        {state !== 'setup' &&
-          (!onboardingMode || state === 'practicing' || state === 'feedback') && (
+        {activeState !== 'setup' &&
+          (!onboardingMode || activeState === 'practicing' || activeState === 'feedback') && (
             <div className="mb-6" data-testid={onboardingMode ? 'onboarding-practice' : undefined}>
               {onboardingMode && (
                 <div className="mb-4">
@@ -1105,9 +1287,13 @@ export default function PracticePage() {
                       router.push(lessonId ? `/read/${lessonId}?onboarding=1` : '/');
                       return;
                     }
-                    setState('setup');
-                    const counts = await getCollectionCounts();
-                    setCollectionCounts(counts);
+                    if (isVocabMode) {
+                      setVocabState('setup');
+                    } else {
+                      setState('setup');
+                      const counts = await getCollectionCounts();
+                      setCollectionCounts(counts);
+                    }
                   }}
                   className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
@@ -1120,7 +1306,7 @@ export default function PracticePage() {
                 ) : (
                   <span className="flex items-center gap-1.5 text-sm font-medium text-[var(--gold-strong)]">
                     <Star className="h-4 w-4" fill="currentColor" />
-                    {points.toLocaleString()}
+                    {activePoints.toLocaleString()}
                   </span>
                 )}
               </div>
@@ -1131,10 +1317,12 @@ export default function PracticePage() {
                   <span>
                     {onboardingMode
                       ? 'Words from your starter lesson'
-                      : COLLECTION_LABELS[selectedCollection]}
+                      : isVocabMode
+                        ? 'Due for Review'
+                        : COLLECTION_LABELS[selectedCollection]}
                   </span>
                   <span className="font-medium">
-                    {roundProgress}/{roundSize}
+                    {activeRoundProgress}/{activeRoundSize}
                   </span>
                 </div>
                 <div className="mt-1 h-3 w-full overflow-hidden rounded-full bg-muted">
@@ -1148,19 +1336,89 @@ export default function PracticePage() {
           )}
 
         {/* Main content area */}
-        {state !== 'setup' && (
+        {activeState !== 'setup' && (
           <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
             {/* Loading state */}
-            {state === 'loading' && (
+            {activeState === 'loading' && (
               <div className="flex flex-col items-center justify-center py-12">
                 <DeckShuffle className="mb-4" />
-                <p className="text-muted-foreground">Loading sentences...</p>
+                <p className="text-muted-foreground">
+                  {isVocabMode ? 'Loading words...' : 'Loading sentences...'}
+                </p>
               </div>
             )}
+            /* Practice state — dictation. Keyed by sentence id so the card remounts per sentence
+            (fresh input, replay budget, autoplay). */
+            {activeState === 'practicing' &&
+              isVocabMode &&
+              vocabCurrent &&
+              vocabMcOptions.length > 0 && (
+                <div className="flex flex-col items-center gap-8 py-8">
+                  {/* The word being reviewed */}
+                  <div
+                    className="text-center text-4xl font-extrabold text-foreground"
+                    dir={getActivePack().script.direction}
+                    lang={getActivePack().script.bcp47}
+                  >
+                    {vocabCurrent.text}
+                  </div>
+                  {/* The translation (the cue) */}
+                  <div className="text-center text-xl text-muted-foreground italic">
+                    {vocabCurrent.translation}
+                  </div>
+                  {/* Multiple choice options */}
+                  <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
+                    {vocabMcOptions.map((option, idx) => {
+                      let btnClass = 'border-border bg-card text-foreground hover:bg-accent';
 
+                      if (vocabMcSelected !== null) {
+                        if (idx === vocabMcCorrectIdx) {
+                          btnClass =
+                            'border-primary bg-[color-mix(in_srgb,var(--primary)_14%,var(--card))] text-primary';
+                        } else if (idx === vocabMcSelected) {
+                          btnClass =
+                            'border-destructive bg-[color-mix(in_srgb,var(--destructive)_12%,var(--card))] text-destructive';
+                        } else {
+                          btnClass = 'border-border bg-card text-muted-foreground opacity-60';
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          data-testid="vocab-mc-option"
+                          onClick={() => handleVocabMcSelect(idx)}
+                          disabled={vocabMcLocked}
+                          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-4 text-left text-lg font-medium transition-all active:scale-[0.98] ${btnClass}`}
+                        >
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-bold text-secondary-foreground">
+                            {idx + 1}
+                          </span>
+                          <bdi
+                            dir={getActivePack().script.direction}
+                            lang={getActivePack().script.bcp47}
+                          >
+                            {option}
+                          </bdi>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Shortcut hint */}
+                  <div className="text-xs text-muted-foreground">
+                    <KbdGroup>
+                      <Kbd>1</Kbd>
+                      <span aria-hidden>–</span>
+                      <Kbd>4</Kbd>
+                    </KbdGroup>{' '}
+                    Choose
+                  </div>
+                </div>
+              )}
             {/* Practice state — dictation. Keyed by sentence id so the card
                 remounts per sentence (fresh input, replay budget, autoplay). */}
-            {state === 'practicing' && current && practiceFormat === 'dictation' && (
+            {activeState === 'practicing' && current && practiceFormat === 'dictation' && (
               <DictationCard
                 key={current.sentence.id}
                 current={current}
@@ -1169,7 +1427,6 @@ export default function PracticePage() {
                 onSentenceBlacklisted={handleSentenceBlacklisted}
               />
             )}
-
             {/* Practice state — cloze */}
             {state === 'practicing' &&
               current &&
@@ -1484,9 +1741,19 @@ export default function PracticePage() {
                   </div>
                 );
               })()}
-
+            {/* Feedback state — vocab (multiple-choice recall) */}
+            {activeState === 'feedback' && isVocabMode && activeCurrent && (
+              <VocabFeedback
+                current={activeCurrent as VocabEntry}
+                correct={vocabMcSelected === vocabMcCorrectIdx}
+                correctMeaning={
+                  vocabMcCorrectIdx !== null ? (vocabMcOptions[vocabMcCorrectIdx] ?? '') : ''
+                }
+                onNext={handleVocabNext}
+              />
+            )}
             {/* Feedback state — dictation */}
-            {state === 'feedback' &&
+            {activeState === 'feedback' &&
               current &&
               practiceFormat === 'dictation' &&
               dictationResult && (
@@ -1497,7 +1764,6 @@ export default function PracticePage() {
                   onSpeak={() => speak(current.sentence.sentence)}
                 />
               )}
-
             {/* Feedback state — cloze */}
             {state === 'feedback' && current && practiceFormat === 'cloze' && feedbackData && (
               <Feedback
@@ -1507,38 +1773,49 @@ export default function PracticePage() {
                 onWordClicked={handleWordClick}
               />
             )}
-
-            {state === 'complete' && !onboardingMode && (
+            {activeState === 'complete' && !onboardingMode && (
               <div className="py-8 text-center">
                 <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--primary)_14%,var(--card))] text-primary">
                   <CheckCircle className="h-8 w-8" />
                 </div>
                 <h2 className="mb-2 text-xl font-bold text-foreground">Round Complete!</h2>
                 <p className="mb-1 text-muted-foreground">
-                  {roundCorrect}/{roundProgress} correct
+                  {activeRoundCorrect}/{activeRoundProgress} correct
                 </p>
                 <p className="mb-6 text-sm text-muted-foreground">
-                  {points.toLocaleString()} total points
+                  {activePoints.toLocaleString()} total points
                 </p>
                 <div className="flex justify-center gap-3">
                   <Button
                     variant={'secondary'}
                     type="button"
                     onClick={async () => {
-                      setState('setup');
-                      const counts = await getCollectionCounts();
-                      setCollectionCounts(counts);
+                      if (isVocabMode) {
+                        setVocabState('setup');
+                      } else {
+                        setState('setup');
+                        const counts = await getCollectionCounts();
+                        setCollectionCounts(counts);
+                      }
                     }}
                   >
                     Change Settings
                   </Button>
-                  <Button type="button" onClick={startRound}>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (isVocabMode) {
+                        startVocabRound(roundSize);
+                      } else {
+                        startRound();
+                      }
+                    }}
+                  >
                     Play Again
                   </Button>
                 </div>
               </div>
             )}
-
             {state === 'complete' && onboardingMode && (
               <div className="py-8 text-center" data-testid="onboarding-summary">
                 <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--primary)_14%,var(--card))] text-primary">
@@ -1638,7 +1915,6 @@ export default function PracticePage() {
                 </div>
               </div>
             )}
-
             {state === 'empty' && onboardingMode && (
               <div
                 className="py-8 text-center"
@@ -1664,14 +1940,31 @@ export default function PracticePage() {
                 </Button>
               </div>
             )}
-
-            {state === 'empty' && !onboardingMode && (
-              <EmptyState
-                roundType={roundType}
-                onBackPressed={handleBackPressed}
-                onLearnNewPressed={handleNewRoundPressed}
-              />
-            )}
+            {activeState === 'empty' &&
+              !onboardingMode &&
+              (isVocabMode ? (
+                <div className="py-8 text-center">
+                  <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--primary)_14%,var(--card))] text-primary">
+                    <BookOpen className="h-8 w-8" />
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-foreground">
+                    No words due for review
+                  </h3>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    Words you save while reading are reviewed on a spaced schedule. Come back later
+                    for another session.
+                  </p>
+                  <Button type="button" variant="secondary" onClick={() => setVocabState('setup')}>
+                    Back to Setup
+                  </Button>
+                </div>
+              ) : (
+                <EmptyState
+                  roundType={roundType}
+                  onBackPressed={handleBackPressed}
+                  onLearnNewPressed={handleNewRoundPressed}
+                />
+              ))}
           </div>
         )}
       </main>

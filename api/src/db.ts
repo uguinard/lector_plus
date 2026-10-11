@@ -93,7 +93,10 @@ function getDb(): Database {
       chapter INTEGER,
       createdAt TEXT NOT NULL,
       pushedToAnki INTEGER DEFAULT 0,
-      ankiNoteId INTEGER
+      ankiNoteId INTEGER,
+      srsLevel INTEGER DEFAULT 0,
+      nextReview TEXT,
+      lastReview TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_vocab_text ON vocab(text);
     CREATE INDEX IF NOT EXISTS idx_vocab_state ON vocab(state);
@@ -565,6 +568,25 @@ function getDb(): Database {
       _db.exec('ALTER TABLE anki_pending ADD COLUMN clipEndMs INTEGER');
   }
 
+  // SRS columns on vocab (#srs): srsLevel (0–6), nextReview, lastReview.
+  // These power the priority-based vocab review queue and are independent of
+  // the existing `state` column (which tracks reader word knowledge).
+  const vocabSrsCols = _db.prepare('PRAGMA table_info(vocab)').all() as { name: string }[];
+  if (vocabSrsCols.length > 0) {
+    if (!vocabSrsCols.some((c) => c.name === 'srsLevel')) {
+      _db.exec('ALTER TABLE vocab ADD COLUMN srsLevel INTEGER DEFAULT 0');
+    }
+    if (!vocabSrsCols.some((c) => c.name === 'nextReview')) {
+      _db.exec("ALTER TABLE vocab ADD COLUMN nextReview TEXT DEFAULT (datetime('now'))");
+    }
+    if (!vocabSrsCols.some((c) => c.name === 'lastReview')) {
+      _db.exec('ALTER TABLE vocab ADD COLUMN lastReview TEXT');
+    }
+    if (!vocabSrsCols.some((c) => c.name === 'language')) {
+      _db.exec("ALTER TABLE vocab ADD COLUMN language TEXT NOT NULL DEFAULT 'af'");
+    }
+  }
+
   migrateVocabForeignKey(_db);
   migrateBooks(_db);
   migrateAddLanguageColumn(_db);
@@ -854,6 +876,7 @@ function ensurePartitionIndexes(database: Database) {
     CREATE INDEX IF NOT EXISTS idx_vocab_user_lang_text ON vocab(userId, language, text);
     CREATE INDEX IF NOT EXISTS idx_cloze_user_lang_nextReview ON clozeSentences(userId, language, nextReview);
     CREATE INDEX IF NOT EXISTS idx_cloze_user_lang_reviewCount ON clozeSentences(userId, language, reviewCount);
+    CREATE INDEX IF NOT EXISTS idx_vocab_user_lang_nextReview ON vocab(userId, language, nextReview);
     CREATE INDEX IF NOT EXISTS idx_dailyStats_user_lang_date ON dailyStats(userId, language, date);
   `);
 }
@@ -1088,7 +1111,7 @@ export function migrateCompositeTenantKeys(database: Database) {
     {
       table: 'vocab',
       createSql: `
-        CREATE TABLE vocab_new (
+         CREATE TABLE vocab_new (
           userId TEXT NOT NULL DEFAULT 'local',
           id TEXT NOT NULL,
           text TEXT NOT NULL,
@@ -1104,6 +1127,9 @@ export function migrateCompositeTenantKeys(database: Database) {
           createdAt TEXT NOT NULL,
           pushedToAnki INTEGER DEFAULT 0,
           ankiNoteId INTEGER,
+          srsLevel INTEGER DEFAULT 0,
+          nextReview TEXT,
+          lastReview TEXT,
           PRIMARY KEY (userId, id)
         )`,
       columns: [
@@ -1122,6 +1148,9 @@ export function migrateCompositeTenantKeys(database: Database) {
         'createdAt',
         'pushedToAnki',
         'ankiNoteId',
+        'srsLevel',
+        'nextReview',
+        'lastReview',
       ],
       indexSql: [
         'CREATE INDEX IF NOT EXISTS idx_vocab_text ON vocab(text)',
@@ -1559,21 +1588,24 @@ function migrateVocabForeignKey(database: Database) {
 
   database.transaction(() => {
     database.exec(`
-      CREATE TABLE vocab_new (
-        id TEXT PRIMARY KEY,
-        text TEXT NOT NULL,
-        type TEXT NOT NULL CHECK (type IN ('word', 'phrase')),
-        sentence TEXT NOT NULL,
-        translation TEXT NOT NULL,
-        state TEXT NOT NULL CHECK (state IN ('new', 'level1', 'level2', 'level3', 'level4', 'known', 'ignored')),
-        stateUpdatedAt TEXT NOT NULL,
-        reviewCount INTEGER DEFAULT 0,
-        bookId TEXT,
-        chapter INTEGER,
-        createdAt TEXT NOT NULL,
-        pushedToAnki INTEGER DEFAULT 0,
-        ankiNoteId INTEGER
-      );
+       CREATE TABLE vocab_new (
+          id TEXT PRIMARY KEY,
+          text TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('word', 'phrase')),
+          sentence TEXT NOT NULL,
+          translation TEXT NOT NULL,
+          state TEXT NOT NULL CHECK (state IN ('new', 'level1', 'level2', 'level3', 'level4', 'known', 'ignored')),
+          stateUpdatedAt TEXT NOT NULL,
+          reviewCount INTEGER DEFAULT 0,
+          bookId TEXT,
+          chapter INTEGER,
+          createdAt TEXT NOT NULL,
+          pushedToAnki INTEGER DEFAULT 0,
+          ankiNoteId INTEGER,
+          srsLevel INTEGER DEFAULT 0,
+          nextReview TEXT,
+          lastReview TEXT
+        );
       INSERT INTO vocab_new SELECT * FROM vocab;
       DROP TABLE vocab;
       ALTER TABLE vocab_new RENAME TO vocab;
@@ -1840,7 +1872,13 @@ export interface VocabRow {
   createdAt: string;
   pushedToAnki: number;
   ankiNoteId: number | null;
+  srsLevel: number;
+  nextReview: string | null;
+  lastReview: string | null;
 }
+
+/** SRS level type for priority-based vocab review (0 = new/unreviewed, 6 = mastered). */
+export type SrsLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface KnownWordRow {
   userId: string;

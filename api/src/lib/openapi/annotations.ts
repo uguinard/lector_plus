@@ -323,6 +323,21 @@ export const schemas: Record<string, JsonSchema> = {
       language: { type: 'string' },
       pushedToAnki: { type: 'integer', enum: [0, 1] },
       ankiNoteId: { type: ['integer', 'null'] },
+      srsLevel: {
+        type: 'integer',
+        enum: [0, 1, 2, 3, 4, 5, 6],
+        description: 'Spaced-repetition level (0=new, 6=mastered).',
+      },
+      nextReview: {
+        type: ['string', 'null'],
+        format: 'date-time',
+        description: 'When the word is next due for review.',
+      },
+      lastReview: {
+        type: ['string', 'null'],
+        format: 'date-time',
+        description: 'When the word was last reviewed.',
+      },
       createdAt: ISO_DATE_TIME,
     },
     required: ['id', 'text', 'type', 'state', 'language', 'createdAt'],
@@ -1074,6 +1089,9 @@ const vocabOps: Record<string, OperationDoc> = {
           bookId: NULLABLE_STRING,
           chapter: { type: ['integer', 'null'] },
           language: { type: 'string' },
+          srsLevel: { type: 'integer', enum: [0, 1, 2, 3, 4, 5, 6] },
+          nextReview: { type: ['string', 'null'], format: 'date-time' },
+          lastReview: { type: ['string', 'null'], format: 'date-time' },
           id: { type: 'string', description: 'Supply your own identifier. Optional.' },
         },
         required: ['text'],
@@ -1108,6 +1126,9 @@ const vocabOps: Record<string, OperationDoc> = {
           reviewCount: { type: 'integer' },
           pushedToAnki: { type: 'integer', enum: [0, 1] },
           ankiNoteId: { type: ['integer', 'null'] },
+          srsLevel: { type: 'integer', enum: [0, 1, 2, 3, 4, 5, 6] },
+          nextReview: { type: ['string', 'null'], format: 'date-time' },
+          lastReview: { type: ['string', 'null'], format: 'date-time' },
         },
       },
     },
@@ -1167,6 +1188,67 @@ const vocabOps: Record<string, OperationDoc> = {
     tag: 'Vocabulary',
     sharedParams: LANG,
     responses: { '200': { description: 'Word to state map.', schema: ref('KnownWordMap') } },
+  },
+  'GET /api/srs/review': {
+    summary: 'List vocabulary due for spaced-repetition review',
+    description:
+      'Returns vocab entries whose `nextReview` is today or in the past, sorted by `nextReview` ascending. ' +
+      'Entries with no `nextReview` (never scheduled) are included at the top of the list. Optional `bookId` filters to a collection.',
+    tag: 'Vocabulary',
+    sharedParams: LANG,
+    query: [
+      {
+        name: 'bookId',
+        description: 'Restrict the queue to entries from this collection.',
+        schema: { type: 'string' },
+      },
+      {
+        name: 'limit',
+        description: 'Maximum entries to return (1–500, default 100).',
+        schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
+      },
+    ],
+    responses: {
+      '200': {
+        description: 'Due vocab entries.',
+        schema: arrayOf('VocabEntry'),
+      },
+    },
+  },
+  'POST /api/srs/schedule': {
+    summary: 'Record spaced-repetition review results',
+    description:
+      'Accepts a batch of `{ id, correct }` review results. Correct answers advance the vocab entry one SRS level (up to 6); incorrect answers hard-reset the level to 0. Each response also updates `nextReview` (today + interval for the new level, or today for a reset) and `lastReview`. The `state` field is synced via the level-to-state map. Returns the count of updated entries.',
+    tag: 'Vocabulary',
+    sharedParams: LANG,
+    requestBody: {
+      required: true,
+      schema: {
+        type: 'array',
+        description: 'Batch of at most 500 review results.',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: 'Vocabulary entry identifier.' },
+            correct: { type: 'boolean', description: 'Whether the learner answered correctly.' },
+          },
+          required: ['id', 'correct'],
+        },
+      },
+    },
+    responses: {
+      '200': {
+        description: 'The batch is processed.',
+        schema: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean' },
+            updated: { type: 'integer' },
+          },
+          required: ['success', 'updated'],
+        },
+      },
+    },
   },
   'POST /api/known-words': {
     summary: 'Update word knowledge states in bulk',

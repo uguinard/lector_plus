@@ -76,7 +76,7 @@ function createOldSchema(db: Database) {
     CREATE INDEX idx_lessons_collectionId ON lessons(collectionId);
     CREATE INDEX idx_lessons_sortOrder ON lessons(collectionId, sortOrder);
 
-    CREATE TABLE vocab (
+     CREATE TABLE vocab (
       id TEXT PRIMARY KEY,
       text TEXT NOT NULL,
       type TEXT NOT NULL CHECK (type IN ('word', 'phrase')),
@@ -90,6 +90,9 @@ function createOldSchema(db: Database) {
       createdAt TEXT NOT NULL,
       pushedToAnki INTEGER DEFAULT 0,
       ankiNoteId INTEGER,
+      srsLevel INTEGER DEFAULT 0,
+      nextReview TEXT DEFAULT (datetime('now')),
+      lastReview TEXT,
       language TEXT NOT NULL DEFAULT 'af',
       userId TEXT NOT NULL DEFAULT 'local'
     );
@@ -168,9 +171,9 @@ function seed(db: Database) {
       VALUES ('les1', 'col1', 'Hoofstuk Een', 1, 'Die kat sit.', 120, 45.5, 3, '${TS}', '${TS}', 'af', 'local'),
              ('les2', 'col2', 'Kapitel Eins', 0, 'Die Katze sitzt.', 0, 0, 3, '${TS}', '${TS}', 'de', 'other-user');
 
-    INSERT INTO vocab (id, text, type, sentence, translation, state, stateUpdatedAt, reviewCount, bookId, chapter, createdAt, pushedToAnki, ankiNoteId, language, userId)
-      VALUES ('v1', 'kat', 'word', 'Die kat sit.', 'cat', 'level2', '${TS}', 4, 'col1', 2, '${TS}', 1, 987, 'af', 'local'),
-             ('v2', 'Katze', 'word', 'Die Katze sitzt.', 'cat', 'new', '${TS}', 0, NULL, NULL, '${TS}', 0, NULL, 'de', 'other-user');
+     INSERT INTO vocab (id, text, type, sentence, translation, state, stateUpdatedAt, reviewCount, bookId, chapter, createdAt, pushedToAnki, ankiNoteId, srsLevel, nextReview, lastReview, language, userId)
+      VALUES ('v1', 'kat', 'word', 'Die kat sit.', 'cat', 'level2', '${TS}', 4, 'col1', 2, '${TS}', 1, 987, 3, '${TS}', '${TS}', 'af', 'local'),
+             ('v2', 'Katze', 'word', 'Die Katze sitzt.', 'cat', 'new', '${TS}', 0, NULL, NULL, '${TS}', 0, NULL, 0, NULL, NULL, 'de', 'other-user');
 
     INSERT INTO clozeSentences (id, sentence, clozeWord, clozeIndex, translation, source, collection, wordRank, tatoebaSentenceId, vocabEntryId, masteryLevel, nextReview, reviewCount, lastReviewed, timesCorrect, timesIncorrect, blacklisted, language, userId)
       VALUES ('c1', 'Die ___ sit.', 'kat', 1, 'The cat sits.', 'mined', 'mined', 12, NULL, 'v1', 50, '${TS}', 7, '${TS}', 6, 1, 0, 'af', 'local'),
@@ -249,6 +252,9 @@ describe('migrateCompositeTenantKeys (#279)', () => {
       createdAt: TS,
       pushedToAnki: 1,
       ankiNoteId: 987,
+      srsLevel: 3,
+      nextReview: TS,
+      lastReview: TS,
     });
   });
 

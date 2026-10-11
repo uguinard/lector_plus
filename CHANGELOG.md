@@ -164,3 +164,44 @@
   - Rationale: the crash occurred because `apiFetch` returns the raw Response
     even for error statuses, and callers called `res.json().map()` without
     checking. The defensive guard degrades gracefully to an empty sentence list.
+
+## 2026-10-11 16:30
+
+- Add priority-based SRS vocab review (levels 0–6 with increasing day intervals)
+  and a new "Vocab" tab on the practice page.
+  - `api/src/db.ts`: added `srsLevel INTEGER DEFAULT 0`, `nextReview TEXT`,
+    `lastReview TEXT` to the vocab `CREATE TABLE` and all migration rebuilds;
+    added `idx_vocab_user_lang_nextReview` index; added `SrsLevel` type.
+  - `api/src/routes/srs.ts` (new): `GET /api/srs/review` (returns due vocab
+    entries) and `POST /api/srs/schedule` (batch-updates levels/reviews per
+    scheduling rules: correct → increment level + set nextReview = today +
+    interval; incorrect → reset to level 0, nextReview = today).
+  - `api/src/routes/registry.ts`: mounted the new SRS route module.
+  - `api/src/routes/vocab.ts`: POST/PUT handlers accept and persist `srsLevel`,
+    `nextReview`, `lastReview`.
+  - `api/src/lib/auth.ts`: added `srs` to `SCOPE_MAP` (vocab:read/write).
+  - `api/src/lib/openapi/annotations.ts`: documented new fields + SRS endpoints;
+    ran `npm run gen:openapi`.
+  - `src/types/index.ts`: added `SrsLevel` type; added optional `srsLevel`,
+    `nextReview`, `lastReview` to `VocabEntry`.
+  - `src/lib/data-layer.ts`: added `getDueVocabForReview` and
+    `scheduleVocabReviews`; updated `mapVocabRow` and all vocab fetchers to parse
+    new date fields.
+  - `src/app/practice/page.tsx`: added "Vocab" tab button, vocab round flow
+    (MC card rendering, feedback screen, empty state, round-complete summary).
+  - `src/app/practice/use-vocab-round.ts` (new): reducer-based round controller
+    for vocab review with retry-queue support.
+  - `src/app/practice/constants.ts`: added `SRS_INTERVALS` and `SRS_LEVEL_MAX`.
+  - `src/app/practice/utils.ts`: added `buildVocabMultipleChoice`,
+    `advanceVocabLevel`, `resetVocabLevel`, `calculateVocabNextReview`.
+  - `src/app/practice/components/VocabFeedback/index.tsx` (new): feedback card
+    for vocab review.
+  - `src/app/vocab/page.tsx`, `src/components/VocabList/*`: display SRS level
+    badge and next-review status in the vocab table.
+  - `e2e/vocab-srs.spec.ts` (new): E2E tests for vocab SRS setup, review flow,
+    level advancement/reset, and the `/api/srs/review` due queue.
+  - `api/src/db.migration.test.ts`: updated old-schema + seed to include SRS
+    columns for migration parity.
+  - Rationale: expands the vocab system from a 1–4 level knowledge-state model
+    to a 7-level (0–6) spaced-repetition scheduler, independent from the existing
+    `state` column which tracks reader vocabulary knowledge.

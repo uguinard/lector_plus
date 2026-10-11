@@ -8876,6 +8876,232 @@
         "x-token-scope": "settings:write"
       }
     },
+    "/api/srs/review": {
+      "get": {
+        "operationId": "getApiSrsReview",
+        "summary": "List vocabulary due for spaced-repetition review",
+        "description": "Returns vocab entries whose `nextReview` is today or in the past, sorted by `nextReview` ascending. Entries with no `nextReview` (never scheduled) are included at the top of the list. Optional `bookId` filters to a collection.",
+        "tags": [
+          "Vocabulary"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LanguageQuery"
+          },
+          {
+            "name": "bookId",
+            "in": "query",
+            "required": false,
+            "description": "Restrict the queue to entries from this collection.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum entries to return (1–500, default 100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Due vocab entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VocabEntry"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token does not carry the scope this endpoint needs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A plan limit or a rate limit stopped the call.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanLimitError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The API failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PersonalAccessToken": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-token-scope": "vocab:read"
+      }
+    },
+    "/api/srs/schedule": {
+      "post": {
+        "operationId": "postApiSrsSchedule",
+        "summary": "Record spaced-repetition review results",
+        "description": "Accepts a batch of `{ id, correct }` review results. Correct answers advance the vocab entry one SRS level (up to 6); incorrect answers hard-reset the level to 0. Each response also updates `nextReview` (today + interval for the new level, or today for a reset) and `lastReview`. The `state` field is synced via the level-to-state map. Returns the count of updated entries.",
+        "tags": [
+          "Vocabulary"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LanguageQuery"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "description": "Batch of at most 500 review results.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Vocabulary entry identifier."
+                    },
+                    "correct": {
+                      "type": "boolean",
+                      "description": "Whether the learner answered correctly."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "correct"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The batch is processed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "updated": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "updated"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is malformed, or a field is not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token does not carry the scope this endpoint needs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A plan limit or a rate limit stopped the call.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanLimitError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The API failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PersonalAccessToken": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-token-scope": "vocab:write"
+      }
+    },
     "/api/stats": {
       "get": {
         "operationId": "getApiStats",
@@ -10676,6 +10902,32 @@
                   "language": {
                     "type": "string"
                   },
+                  "srsLevel": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "nextReview": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "lastReview": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
                   "id": {
                     "type": "string",
                     "description": "Supply your own identifier. Optional."
@@ -11011,6 +11263,32 @@
                       "integer",
                       "null"
                     ]
+                  },
+                  "srsLevel": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4,
+                      5,
+                      6
+                    ]
+                  },
+                  "nextReview": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "lastReview": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
                   }
                 }
               }
@@ -11761,6 +12039,35 @@
               "integer",
               "null"
             ]
+          },
+          "srsLevel": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "description": "Spaced-repetition level (0=new, 6=mastered)."
+          },
+          "nextReview": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the word is next due for review."
+          },
+          "lastReview": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the word was last reviewed."
           },
           "createdAt": {
             "type": "string",

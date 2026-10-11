@@ -46,6 +46,8 @@ export default function VocabPage() {
   const [stats, setStats] = useState<{
     total: number;
     byState: Record<WordState, number>;
+    srsDue: number;
+    srsTotal: number;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<VocabEntry | null>(null);
@@ -96,7 +98,12 @@ export default function VocabPage() {
       vocabData.forEach((v) => {
         byState[v.state]++;
       });
-      setStats({ total: vocabData.length, byState });
+      const today = new Date();
+      const srsDue = vocabData.filter(
+        (v) => v.nextReview && new Date(v.nextReview) <= today,
+      ).length;
+      const srsTotal = vocabData.filter((v) => v.nextReview != null).length;
+      setStats({ total: vocabData.length, byState, srsDue, srsTotal });
     } catch (error) {
       console.error('Failed to load data:', error);
       toast.error('Failed to load vocabulary data', {

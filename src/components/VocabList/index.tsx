@@ -447,6 +447,8 @@ export default function VocabList({
                 State
                 <SortIndicator field="state" />
               </th>
+              <th className="px-4 py-3 text-sm font-semibold text-foreground">SRS Level</th>
+              <th className="px-4 py-3 text-sm font-semibold text-foreground">Next Review</th>
               <th
                 className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground hover:text-foreground"
                 onClick={() => handleSort('bookId')}
@@ -467,7 +469,7 @@ export default function VocabList({
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center">
+                <td colSpan={9} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <span className="text-muted-foreground">Loading vocabulary...</span>
@@ -476,7 +478,7 @@ export default function VocabList({
               </tr>
             ) : filteredEntries.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
                   {entries.length === 0
                     ? 'No vocabulary entries yet. Start reading to add words!'
                     : 'No entries match your filters.'}

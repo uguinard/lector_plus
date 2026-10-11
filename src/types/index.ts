@@ -5,6 +5,7 @@
  */
 
 export type WordState = 'new' | 'level1' | 'level2' | 'level3' | 'level4' | 'known' | 'ignored';
+export type SrsLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type VocabType = 'word' | 'phrase';
 export type ClozeMasteryLevel = 0 | 25 | 50 | 75 | 100;
 export type ClozeSource = 'tatoeba' | 'mined';
@@ -135,6 +136,9 @@ export interface VocabEntry {
   createdAt: Date;
   pushedToAnki: boolean;
   ankiNoteId?: number;
+  srsLevel?: SrsLevel;
+  nextReview?: Date | null;
+  lastReview?: Date | null;
 }
 
 export interface KnownWord {

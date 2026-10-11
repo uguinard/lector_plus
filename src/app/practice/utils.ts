@@ -9,9 +9,14 @@ import {
   resolveClozeTokens,
   type LanguageConfig,
 } from '@/lib/languages';
-import { ClozeMasteryLevel, ClozeSentence } from '@/types';
+import { ClozeMasteryLevel, ClozeSentence, VocabEntry } from '@/types';
 import { DictationDiff, DictationWord, FuzzyStatus, PracticeMode } from './types';
-import { DICTATION_PASS_THRESHOLD, DICTATION_POINTS_BASE } from './constants';
+import {
+  DICTATION_PASS_THRESHOLD,
+  DICTATION_POINTS_BASE,
+  SRS_INTERVALS,
+  SRS_LEVEL_MAX,
+} from './constants';
 
 // Helper export function to create blanked sentence, moving punctuation outside the blank.
 //
@@ -208,7 +213,46 @@ export function buildMultipleChoiceOptions(
   return { options, correctIndex };
 }
 
-// --- Dictation scoring ------------------------------------------------------
+// Build a multiple-choice set for vocab review: the correct answer is the
+// target word's translation; distractors are translations from other vocab
+// entries in the round, falling back to source-text words when the pool is
+// too small.
+export function buildVocabMultipleChoice(
+  correctTranslation: string,
+  pool: VocabEntry[],
+  fallbackWords: string[] = [],
+): { options: string[]; correctIndex: number } {
+  const seen = new Set<string>([normalize(correctTranslation)]);
+  const candidates: string[] = [];
+
+  for (const entry of pool) {
+    const t = entry.translation;
+    if (t && !seen.has(normalize(t))) {
+      seen.add(normalize(t));
+      candidates.push(t);
+    }
+  }
+
+  for (const w of fallbackWords) {
+    if (w && !seen.has(normalize(w))) {
+      seen.add(normalize(w));
+      candidates.push(w);
+    }
+  }
+
+  const top = candidates.slice(0, Math.min(12, candidates.length));
+  for (let i = top.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [top[i], top[j]] = [top[j], top[i]];
+  }
+
+  const options = shuffle([correctTranslation, ...top.slice(0, 3)]);
+  const correctIndex = options.findIndex(
+    (option) => normalize(option) === normalize(correctTranslation),
+  );
+
+  return { options, correctIndex };
+}
 
 // Compare what the user typed against the actual sentence at the word level.
 // Words are matched on their normalized form (case- and punctuation-insensitive,
@@ -280,4 +324,28 @@ export function scoreDictation(diff: DictationDiff): { isPass: boolean; isPerfec
 export function calculateDictationPoints(mastery: ClozeMasteryLevel, accuracy: number): number {
   const masteryMultiplier = mastery / 25;
   return Math.max(0, Math.round(DICTATION_POINTS_BASE * masteryMultiplier * accuracy));
+}
+
+// --- Vocab SRS scheduling ----------------------------------------------------
+
+export function calculateVocabNextReview(level: number): Date {
+  const days = SRS_INTERVALS[level] ?? SRS_INTERVALS[0];
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+export function advanceVocabLevel(currentLevel: number): number {
+  return Math.min(SRS_LEVEL_MAX, currentLevel + 1);
+}
+
+export function resetVocabLevel(): number {
+  return 0;
+}
+
+export interface VocabReviewResult {
+  id: string;
+  isCorrect: boolean;
+  newLevel: number;
+  nextReview: Date;
 }

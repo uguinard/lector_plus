@@ -1,6 +1,6 @@
 import type { SQLQueryBindings } from 'bun:sqlite';
 import { Hono } from 'hono';
-import { db, VocabRow } from '../db';
+import { db, VocabRow, SrsLevel } from '../db';
 import { resolveLanguage } from '../lib/active-language';
 import { foldWord, getLanguageConfig, normalizeText } from '../lib/languages';
 import { getCurrentUserId } from '../lib/user';
@@ -22,6 +22,7 @@ import {
   validateOwnedReference,
   validateSafeInteger,
   validateWordKey,
+  validateTimestamp,
 } from '../lib/persisted-input';
 import { notifyVocabSaved } from '../lib/lifecycle-email';
 
@@ -36,6 +37,15 @@ const WORD_STATES = new Set([
   'known',
   'ignored',
 ] as const);
+const SRS_LEVELS: ReadonlySet<SrsLevel> = new Set([0, 1, 2, 3, 4, 5, 6]);
+
+function validateSrsLevel(value: unknown, field: string): string | null {
+  if (value === undefined) return null;
+  if (!Number.isSafeInteger(value)) return `${field} must be an integer between 0 and 6`;
+  const n = value as number;
+  if (n < 0 || n > 6) return `${field} must be between 0 and 6`;
+  return null;
+}
 
 // GET /api/vocab
 app.get('/', (c) => {
@@ -88,6 +98,9 @@ app.get('/', (c) => {
       createdAt: v.createdAt,
       pushedToAnki: v.pushedToAnki === 1,
       ankiNoteId: v.ankiNoteId,
+      srsLevel: v.srsLevel,
+      nextReview: v.nextReview,
+      lastReview: v.lastReview,
     })),
   );
 });
@@ -129,6 +142,18 @@ app.post('/', async (c) => {
   }
   const pushedError = validateBooleanLike(body.pushedToAnki, 'pushedToAnki');
   if (pushedError) return c.json({ error: pushedError }, 400);
+  const srsLevelError = validateSrsLevel(body.srsLevel, 'srsLevel');
+  if (srsLevelError) return c.json({ error: srsLevelError }, 400);
+  const nextReviewError = validateTimestamp(body.nextReview, 'nextReview', {
+    optional: true,
+    nullable: true,
+  });
+  if (nextReviewError) return c.json({ error: nextReviewError }, 400);
+  const lastReviewError = validateTimestamp(body.lastReview, 'lastReview', {
+    optional: true,
+    nullable: true,
+  });
+  if (lastReviewError) return c.json({ error: lastReviewError }, 400);
   const id = body.id || randomUUID();
   const now = new Date().toISOString();
   const lang = resolveLanguage(body.language, userId);
@@ -164,15 +189,16 @@ app.post('/', async (c) => {
   const verdict = entitlements.reserveCount(userId, checks, () => {
     db.prepare(
       `
-      INSERT INTO vocab (id, text, type, sentence, translation, state, stateUpdatedAt, reviewCount, bookId, chapter, createdAt, pushedToAnki, ankiNoteId, language, userId)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO vocab (id, text, type, sentence, translation, state, stateUpdatedAt, reviewCount, bookId, chapter, createdAt, pushedToAnki, ankiNoteId, srsLevel, nextReview, lastReview, language, userId)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(userId, id) DO UPDATE SET
         text = excluded.text, type = excluded.type, sentence = excluded.sentence,
         translation = excluded.translation, state = excluded.state,
         stateUpdatedAt = excluded.stateUpdatedAt, reviewCount = excluded.reviewCount,
         bookId = excluded.bookId, chapter = excluded.chapter, createdAt = excluded.createdAt,
         pushedToAnki = excluded.pushedToAnki, ankiNoteId = excluded.ankiNoteId,
-        language = excluded.language
+        srsLevel = excluded.srsLevel, nextReview = excluded.nextReview,
+        lastReview = excluded.lastReview, language = excluded.language
     `,
     ).run(
       id,
@@ -188,6 +214,9 @@ app.post('/', async (c) => {
       now,
       body.pushedToAnki === undefined ? 0 : booleanLikeToSql(body.pushedToAnki as boolean | 0 | 1),
       body.ankiNoteId ?? null,
+      body.srsLevel ?? 0,
+      body.nextReview ?? null,
+      body.lastReview ?? null,
       lang,
       userId,
     );
@@ -239,6 +268,18 @@ app.put('/:id', async (c) => {
     nullable: true,
   });
   if (ankiNoteIdError) return c.json({ error: ankiNoteIdError }, 400);
+  const srsLevelError = validateSrsLevel(body.srsLevel, 'srsLevel');
+  if (srsLevelError) return c.json({ error: srsLevelError }, 400);
+  const nextReviewError = validateTimestamp(body.nextReview, 'nextReview', {
+    optional: true,
+    nullable: true,
+  });
+  if (nextReviewError) return c.json({ error: nextReviewError }, 400);
+  const lastReviewError = validateTimestamp(body.lastReview, 'lastReview', {
+    optional: true,
+    nullable: true,
+  });
+  if (lastReviewError) return c.json({ error: lastReviewError }, 400);
 
   const existing = db.prepare('SELECT * FROM vocab WHERE id = ? AND userId = ?').get(id, userId) as
     | VocabRow
@@ -279,6 +320,18 @@ app.put('/:id', async (c) => {
   if (body.ankiNoteId !== undefined) {
     updates.push('ankiNoteId = ?');
     values.push(body.ankiNoteId);
+  }
+  if (body.srsLevel !== undefined) {
+    updates.push('srsLevel = ?');
+    values.push(body.srsLevel);
+  }
+  if (body.nextReview !== undefined) {
+    updates.push('nextReview = ?');
+    values.push(body.nextReview ?? null);
+  }
+  if (body.lastReview !== undefined) {
+    updates.push('lastReview = ?');
+    values.push(body.lastReview ?? null);
   }
 
   const previousVocabBytes = vocabContentBytes(existing);

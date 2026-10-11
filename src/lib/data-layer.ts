@@ -490,11 +490,7 @@ export async function getAllVocab(): Promise<VocabEntry[]> {
   return cachedQuery(activeLanguageQueryKey(VOCAB_QUERY_SCOPE, ['all']), async () => {
     const res = await apiFetch(`/api/vocab${langParam()}`);
     const vocab = await res.json();
-    return vocab.map((v: Record<string, unknown>) => ({
-      ...v,
-      stateUpdatedAt: new Date(v.stateUpdatedAt as string),
-      createdAt: new Date(v.createdAt as string),
-    }));
+    return vocab.map((v: Record<string, unknown>) => mapVocabRow(v));
   });
 }
 
@@ -533,16 +529,23 @@ export async function getLessonReadings(
   return new Map(Object.entries(result ?? {}));
 }
 
+function mapVocabRow(v: Record<string, unknown>): VocabEntry {
+  return {
+    ...v,
+    srsLevel: v.srsLevel as number,
+    stateUpdatedAt: new Date(v.stateUpdatedAt as string),
+    createdAt: new Date(v.createdAt as string),
+    nextReview: v.nextReview ? new Date(v.nextReview as string) : null,
+    lastReview: v.lastReview ? new Date(v.lastReview as string) : null,
+  } as unknown as VocabEntry;
+}
+
 export async function getVocabEntry(id: string): Promise<VocabEntry | undefined> {
   return cachedQuery(activeLanguageQueryKey(VOCAB_QUERY_SCOPE, ['id', id]), async () => {
     const res = await apiFetch(`/api/vocab/${id}`);
     if (!res.ok) return undefined;
     const data = await res.json();
-    return {
-      ...data,
-      stateUpdatedAt: new Date(data.stateUpdatedAt),
-      createdAt: new Date(data.createdAt),
-    };
+    return mapVocabRow(data);
   });
 }
 
@@ -554,11 +557,7 @@ export async function getVocabByText(text: string): Promise<VocabEntry | undefin
     const vocab = await res.json();
     const match = vocab[0];
     if (!match) return undefined;
-    return {
-      ...match,
-      stateUpdatedAt: new Date(match.stateUpdatedAt),
-      createdAt: new Date(match.createdAt),
-    };
+    return mapVocabRow(match);
   });
 }
 
@@ -593,12 +592,21 @@ export async function updateVocabState(id: string, state: WordState): Promise<bo
 /** Persist the editable fields exposed by the vocab detail modal in one write. */
 export async function updateVocabEntry(
   id: string,
-  updates: Partial<Pick<VocabEntry, 'state' | 'translation' | 'sentence'>>,
+  updates: Partial<
+    Pick<
+      VocabEntry,
+      'state' | 'translation' | 'sentence' | 'srsLevel' | 'nextReview' | 'lastReview'
+    >
+  >,
 ): Promise<void> {
   const res = await apiFetch(`/api/vocab/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
+    body: JSON.stringify({
+      ...updates,
+      nextReview: updates.nextReview?.toISOString() ?? undefined,
+      lastReview: updates.lastReview?.toISOString() ?? undefined,
+    }),
   });
   if (!res.ok) throw await apiError(res, 'Could not update vocabulary entry');
   invalidateVocab();
@@ -609,11 +617,7 @@ export async function getVocabByState(state: WordState): Promise<VocabEntry[]> {
   return cachedQuery(activeLanguageQueryKey(VOCAB_QUERY_SCOPE, ['state', state]), async () => {
     const res = await apiFetch(`/api/vocab${langParam()}&state=${state}`);
     const vocab = await res.json();
-    return vocab.map((v: Record<string, unknown>) => ({
-      ...v,
-      stateUpdatedAt: new Date(v.stateUpdatedAt as string),
-      createdAt: new Date(v.createdAt as string),
-    }));
+    return vocab.map((v: Record<string, unknown>) => mapVocabRow(v));
   });
 }
 
@@ -621,11 +625,7 @@ export async function getVocabForBook(bookId: string): Promise<VocabEntry[]> {
   return cachedQuery(activeLanguageQueryKey(VOCAB_QUERY_SCOPE, ['book', bookId]), async () => {
     const res = await apiFetch(`/api/vocab${langParam()}&bookId=${bookId}`);
     const vocab = await res.json();
-    return vocab.map((v: Record<string, unknown>) => ({
-      ...v,
-      stateUpdatedAt: new Date(v.stateUpdatedAt as string),
-      createdAt: new Date(v.createdAt as string),
-    }));
+    return vocab.map((v: Record<string, unknown>) => mapVocabRow(v));
   });
 }
 
@@ -633,11 +633,7 @@ export async function getUnpushedVocab(): Promise<VocabEntry[]> {
   return cachedQuery(activeLanguageQueryKey(VOCAB_QUERY_SCOPE, ['unpushed']), async () => {
     const res = await apiFetch(`/api/vocab${langParam()}&unpushed=true`);
     const vocab = await res.json();
-    return vocab.map((v: Record<string, unknown>) => ({
-      ...v,
-      stateUpdatedAt: new Date(v.stateUpdatedAt as string),
-      createdAt: new Date(v.createdAt as string),
-    }));
+    return vocab.map((v: Record<string, unknown>) => mapVocabRow(v));
   });
 }
 
@@ -713,6 +709,49 @@ export async function getKnownWordsMap(): Promise<Map<string, WordState>> {
   const res = await apiFetch(`/api/known-words${langParam()}`);
   const data = await res.json();
   return new Map(Object.entries(data) as [string, WordState][]);
+}
+
+// ============================================================================
+// Vocab SRS (priority-based spaced repetition, levels 0–6)
+// ============================================================================
+
+/** A vocab entry returned by GET /api/srs/review, with review timestamps parsed. */
+export interface SrsReviewEntry extends Omit<VocabEntry, 'nextReview' | 'lastReview'> {
+  nextReview: Date | null;
+  lastReview: Date | null;
+}
+
+export async function getDueVocabForReview(limit = 50, bookId?: string): Promise<SrsReviewEntry[]> {
+  const params = new URLSearchParams({ language: getActiveLanguage() });
+  params.set('limit', String(limit));
+  if (bookId) params.set('bookId', bookId);
+  const res = await apiFetch(`/api/srs/review?${params.toString()}`);
+  if (!res.ok) return [];
+  const rows = await res.json();
+  return rows.map((v: Record<string, unknown>) => ({
+    ...v,
+    stateUpdatedAt: new Date(v.stateUpdatedAt as string),
+    createdAt: new Date(v.createdAt as string),
+    nextReview: v.nextReview ? new Date(v.nextReview as string) : null,
+    lastReview: v.lastReview ? new Date(v.lastReview as string) : null,
+  }));
+}
+
+export async function scheduleVocabReviews(
+  reviews: Array<{ id: string; correct: boolean }>,
+): Promise<number> {
+  const res = await apiFetch('/api/srs/schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(reviews),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error || 'Could not save review results');
+  }
+  const data = (await res.json()) as { updated: number };
+  invalidateVocab();
+  return data.updated;
 }
 
 // ============================================================================
@@ -820,7 +859,7 @@ export async function getClozeSentencesDueForReview(limit: number = 20): Promise
     ...s,
     nextReview: new Date(s.nextReview as string),
     lastReviewed: s.lastReviewed ? new Date(s.lastReviewed as string) : undefined,
-  }));
+  })) as ClozeSentence[];
 }
 
 export async function updateClozeAfterReview(
@@ -849,7 +888,7 @@ export async function getAllClozeSentences(): Promise<ClozeSentence[]> {
     ...s,
     nextReview: new Date(s.nextReview as string),
     lastReviewed: s.lastReviewed ? new Date(s.lastReviewed as string) : undefined,
-  }));
+  })) as ClozeSentence[];
 }
 
 export async function getClozeTotals(): Promise<{ timesCorrect: number; timesIncorrect: number }> {
@@ -872,7 +911,7 @@ export async function getClozeSentencesForWord(word: string): Promise<ClozeSente
     ...s,
     nextReview: new Date(s.nextReview as string),
     lastReviewed: s.lastReviewed ? new Date(s.lastReviewed as string) : undefined,
-  }));
+  })) as ClozeSentence[];
 }
 
 export async function bulkSaveClozeSentences(sentences: ClozeSentence[]): Promise<void> {
@@ -938,7 +977,7 @@ export async function getClozeSentencesByCollection(
     ...s,
     nextReview: new Date(s.nextReview as string),
     lastReviewed: s.lastReviewed ? new Date(s.lastReviewed as string) : undefined,
-  }));
+  })) as ClozeSentence[];
 }
 
 export async function getNewSentencesByCollection(
@@ -963,7 +1002,7 @@ export async function getNewSentencesByCollection(
     ...s,
     nextReview: new Date(s.nextReview as string),
     lastReviewed: s.lastReviewed ? new Date(s.lastReviewed as string) : undefined,
-  }));
+  })) as ClozeSentence[];
 }
 
 export async function getCollectionCounts(): Promise<
@@ -1337,7 +1376,7 @@ export async function getOnboardingCloze(vocabIds: string[]): Promise<ClozeSente
     ...sentence,
     nextReview: new Date(sentence.nextReview as string),
     lastReviewed: sentence.lastReviewed ? new Date(sentence.lastReviewed as string) : undefined,
-  }));
+  })) as ClozeSentence[];
 }
 
 // ============================================================================

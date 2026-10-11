@@ -33,3 +33,18 @@ export const DICTATION_MAX_REPLAYS = 3;
 
 // Playback speed multipliers offered during dictation (× the normal TTS rate).
 export const DICTATION_SPEEDS = [1, 0.75, 0.5] as const;
+
+// --- Vocab SRS (priority-based, levels 0–6) -----------------------------------
+
+// Days to delay the next review at each SRS level. Level 0 = new/unreviewed.
+export const SRS_INTERVALS: Record<number, number> = {
+  0: 1,
+  1: 3,
+  2: 7,
+  3: 14,
+  4: 30,
+  5: 60,
+  6: 90,
+};
+
+export const SRS_LEVEL_MAX = 6;

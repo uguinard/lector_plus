@@ -15,6 +15,7 @@ import anki from './anki';
 import lessons from './lessons';
 import vocab from './vocab';
 import cloze from './cloze';
+import srs from './srs';
 import stats from './stats';
 import settings from './settings';
 import starter from './starter';
@@ -77,6 +78,7 @@ export const routeMounts: readonly RouteMount[] = [
   { prefix: '/api/lessons', app: lessons },
   { prefix: '/api/vocab', app: vocab },
   { prefix: '/api/cloze', app: cloze },
+  { prefix: '/api/srs', app: srs },
   { prefix: '/api/stats', app: stats },
   { prefix: '/api/settings', app: settings },
   { prefix: '/api/starter', app: starter },
