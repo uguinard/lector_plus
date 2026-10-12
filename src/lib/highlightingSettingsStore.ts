@@ -17,7 +17,7 @@ const defaults = {
   highlightPadding: 3,
   highlightTransparency: 0.2,
   highlightBorderRadius: 5,
-  highlightColor: '--primary',
+  highlightColor: 'var(--primary)',
   phraseBorderStyle: 'solid',
   persistHighlights: false,
   autoRestoreHighlights: false,

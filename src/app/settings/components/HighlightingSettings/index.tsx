@@ -23,7 +23,7 @@ export function useHighlightingSettings() {
     padding: 3,
     transparency: 0.2,
     borderRadius: 5,
-    highlightColor: '--primary',
+    highlightColor: 'var(--primary)',
     phraseBorderStyle: 'solid',
     persistHighlights: false,
     autoRestoreHighlights: false,
