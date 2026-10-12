@@ -138,6 +138,7 @@ import type {
 export async function getAllCollections(): Promise<Collection[]> {
   return cachedQuery(activeLanguageQueryKey(COLLECTIONS_QUERY_SCOPE), async () => {
     const res = await apiFetch(`/api/collections${langParam()}`);
+    if (!res.ok) throw await apiError(res, 'Could not load collections');
     return res.json();
   });
 }
@@ -489,6 +490,7 @@ export async function importYouTubeTranscript(input: {
 export async function getAllVocab(): Promise<VocabEntry[]> {
   return cachedQuery(activeLanguageQueryKey(VOCAB_QUERY_SCOPE, ['all']), async () => {
     const res = await apiFetch(`/api/vocab${langParam()}`);
+    if (!res.ok) throw await apiError(res, 'Could not load vocabulary');
     const vocab = await res.json();
     return vocab.map((v: Record<string, unknown>) => ({
       ...v,
