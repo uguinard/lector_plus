@@ -20,30 +20,75 @@ import BYOKSettings from './components/BYOKSettings';
 import CloudPlanSettings from './components/CloudPlanSettings';
 import HighlightingSettings from './components/HighlightingSettings';
 import { lectorMode } from '@/lib/api-base';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+
+const TAB_APPEARANCE = 'appearance';
+const TAB_PRACTICE = 'practice';
+const TAB_LANGUAGES = 'languages';
+const TAB_DATA_INTEGRATION = 'data-integration';
+const TAB_ACCOUNT = 'account';
+const TAB_MISC = 'misc';
 
 export default function SettingsPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <PageHeader title="Settings" />
-      <div className="space-y-8">
-        {lectorMode() === 'cloud' && <CloudPlanSettings />}
-        <LanguagesSettings />
-        <ProseSettings />
-        <PracticeSettings />
-        {lectorMode() === 'cloud' ? <BYOKSettings /> : <LLMSettings />}
-        <AnkiSettings />
-        <TTSSettings />
-        <ThemeSettings />
-        <Timezone />
-        <TwoFactorSettings />
-        <APITokens />
-        <HighlightingSettings />
-        <KnownWordsImport />
-        <Export />
-        <DataManagement />
-        <DeleteAccount />
-        <VersionInfo />
-      </div>
+      <Tabs defaultValue={TAB_APPEARANCE}>
+        <TabsList>
+          <TabsTrigger value={TAB_APPEARANCE}>Appearance</TabsTrigger>
+          <TabsTrigger value={TAB_PRACTICE}>Practice</TabsTrigger>
+          <TabsTrigger value={TAB_LANGUAGES}>Languages</TabsTrigger>
+          <TabsTrigger value={TAB_DATA_INTEGRATION}>Data &amp; Integration</TabsTrigger>
+          <TabsTrigger value={TAB_ACCOUNT}>Account</TabsTrigger>
+          <TabsTrigger value={TAB_MISC}>Misc</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={TAB_APPEARANCE}>
+          <div className="space-y-8">
+            <HighlightingSettings />
+            <ThemeSettings />
+            <ProseSettings />
+          </div>
+        </TabsContent>
+
+        <TabsContent value={TAB_PRACTICE}>
+          <div className="space-y-8">
+            <PracticeSettings />
+          </div>
+        </TabsContent>
+
+        <TabsContent value={TAB_LANGUAGES}>
+          <div className="space-y-8">
+            <LanguagesSettings />
+          </div>
+        </TabsContent>
+
+        <TabsContent value={TAB_DATA_INTEGRATION}>
+          <div className="space-y-8">
+            {lectorMode() === 'cloud' && <CloudPlanSettings />}
+            {lectorMode() === 'cloud' ? <BYOKSettings /> : <LLMSettings />}
+            <AnkiSettings />
+            <TTSSettings />
+            <APITokens />
+            <DataManagement />
+            <VersionInfo />
+          </div>
+        </TabsContent>
+
+        <TabsContent value={TAB_ACCOUNT}>
+          <div className="space-y-8">
+            <TwoFactorSettings />
+            <DeleteAccount />
+          </div>
+        </TabsContent>
+
+        <TabsContent value={TAB_MISC}>
+          <div className="space-y-8">
+            <KnownWordsImport />
+            <Export />
+          </div>
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

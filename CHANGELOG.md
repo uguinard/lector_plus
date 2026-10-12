@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-12 16:10
+
+- Add tabbed settings page layout organizing 17 settings components into 6 logical tab groups.
+  - `src/components/ui/tabs.tsx`: new tab component (`Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`) using radio-input state pattern with `border-b-2 border-primary` active indicator.
+  - `src/app/settings/page.tsx`: replaced sequential `div className="space-y-8"` render with `<Tabs>` component; tabs are Appearance, Practice, Languages, Data & Integration, Account, Misc.
+  - Conditional `lectorMode()` logic preserved inside respective tab panels (cloud→BYOK+CloudPlan; local→LLM).
+  - All 852 tests pass; TypeScript clean.
+
 ## 2026-10-11 10:16
 
 - Fix Shift+Arrow phrase selection: words now visually highlight and the sidebar shows the phrase with spaces and punctuation (e.g. "the cat," not "thecat").
