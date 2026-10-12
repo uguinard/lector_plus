@@ -215,12 +215,15 @@ export const uk = {
   // Standard voice, and it is female, matching the tier + gender those packs
   // use. Verified against the live voices API 2026-08-07.
   ttsVoice: 'uk-UA-Standard-B',
+  supertonicLang: 'uk',
+  supertonicVoice: 'M1',
   tatoebaCode: 'ukr',
   fallbackTts: ['uk', 'uk-UA'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Привіт! Як справи?',
   // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
-  pronunciation: { audio: ['google'] as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'uk',
     direction: 'ltr' as const,

@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import {
   getTTSMode,
   isGoogleTTSConfigured,
+  isSupertonicAvailable,
   setTTSMode,
   speak,
   TTSMode,
@@ -19,11 +20,34 @@ import { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import { SETTINGS_KEYS } from '../../constants';
 import type { RecommendedVoice } from '@/lib/browser-tts-voices';
 
+// Supertonic voice options (M1–M5, F1–F5)
+const SUPERTONIC_VOICES = [
+  { id: 'M1', label: 'M1 (Male)' },
+  { id: 'M2', label: 'M2 (Male)' },
+  { id: 'M3', label: 'M3 (Male)' },
+  { id: 'M4', label: 'M4 (Male)' },
+  { id: 'M5', label: 'M5 (Male)' },
+  { id: 'F1', label: 'F1 (Female)' },
+  { id: 'F2', label: 'F2 (Female)' },
+  { id: 'F3', label: 'F3 (Female)' },
+  { id: 'F4', label: 'F4 (Female)' },
+  { id: 'F5', label: 'F5 (Female)' },
+] as const;
+
+type SupertonicVoiceId = (typeof SUPERTONIC_VOICES)[number]['id'];
+
+const SUPERONIC_VOICE_KEY_PREFIX = 'lector-supertonic-voice-';
+
+function supertonicVoicePrefKey(languageCode: string): string {
+  return `${SUPERONIC_VOICE_KEY_PREFIX}${languageCode}`;
+}
+
 export default function TTSSettings() {
   const [ttsSpeed, setTTSSpeed] = useState(1);
   const activeLang = useActiveLanguage();
   const [currentTTSMode, setCurrentTTSMode] = useState<TTSMode>('browser');
   const [googleTTSAvailable, setGoogleTTSAvailable] = useState<boolean | null>(null);
+  const [supertonicAvailable, setSupertonicAvailable] = useState<boolean | null>(null);
   const [managedTTSIncluded, setManagedTTSIncluded] = useState<boolean | null>(null);
 
   // Voice selector state
@@ -31,17 +55,29 @@ export default function TTSSettings() {
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>('');
   const [loadingVoices, setLoadingVoices] = useState(false);
 
+  // Supertonic voice selector state
+  const [selectedSupertonicVoice, setSelectedSupertonicVoice] = useState<SupertonicVoiceId>('M1');
+
   // Languages without a Google voice (eo) always speak through the server's
   // self-hosted eSpeak NG engine — no engine choice, no plan gating, no
   // browser fallback (#307 §3.2c). The picker below absents itself.
   const noAudio = activeLang.pronunciation.audio === 'none';
   const espeakOnly =
     activeLang.pronunciation.audio !== 'none' && !activeLang.pronunciation.audio.includes('google');
+  const supertonicSupported = activeLang.pronunciation.audio.includes('supertonic');
 
   useEffect(() => {
     const init = async () => {
       setCurrentTTSMode(getTTSMode());
       setTTSSpeed(parseFloat(localStorage.getItem(SETTINGS_KEYS.TTS_SPEED) || '1.0'));
+
+      // Load saved Supertonic voice preference
+      const savedSupertonicVoice = localStorage.getItem(
+        supertonicVoicePrefKey(activeLang.code),
+      ) as SupertonicVoiceId | null;
+      if (savedSupertonicVoice && SUPERTONIC_VOICES.some((v) => v.id === savedSupertonicVoice)) {
+        setSelectedSupertonicVoice(savedSupertonicVoice);
+      }
 
       // eSpeak-only languages skip the managed-voice probe entirely: the
       // Google mode/upsell UI is hidden, and probing /api/tts would just
@@ -57,6 +93,7 @@ export default function TTSSettings() {
           // future Speak action stays local without a doomed API request.
           setManagedTTSIncluded(false);
           setGoogleTTSAvailable(false);
+          setSupertonicAvailable(await isSupertonicAvailable()); // Supertonic is free on all tiers
           setCurrentTTSMode('browser');
           setTTSMode('browser');
           return;
@@ -67,10 +104,11 @@ export default function TTSSettings() {
       // Paid cloud and self-hosted deployments still verify that managed TTS
       // is configured before enabling it.
       setGoogleTTSAvailable(await isGoogleTTSConfigured());
+      setSupertonicAvailable(await isSupertonicAvailable());
     };
 
     void init();
-  }, [espeakOnly]);
+  }, [espeakOnly, activeLang.code]);
 
   // Load browser voices when component mounts or language/mode changes
   useEffect(() => {
@@ -120,6 +158,13 @@ export default function TTSSettings() {
     speak(activeLang.testPhrase, ttsSpeed);
   };
 
+  const handleSupertonicVoiceChange = (voiceId: SupertonicVoiceId) => {
+    setSelectedSupertonicVoice(voiceId);
+    localStorage.setItem(supertonicVoicePrefKey(activeLang.code), voiceId);
+    // Test the new voice immediately
+    speak(activeLang.testPhrase, ttsSpeed);
+  };
+
   const handleRefreshVoices = useCallback(async () => {
     setLoadingVoices(true);
     try {
@@ -165,17 +210,17 @@ export default function TTSSettings() {
             <span className="text-sm text-muted-foreground">Synthesized voice</span>
           </div>
         ) : (
-          googleTTSAvailable !== null && (
+          (googleTTSAvailable !== null || supertonicAvailable !== null) && (
             <div className="flex items-center gap-2">
               <span
                 className={`inline-block h-2 w-2 rounded-full ${
-                  googleTTSAvailable ? 'bg-primary' : 'bg-yellow-500'
+                  googleTTSAvailable || supertonicAvailable ? 'bg-primary' : 'bg-yellow-500'
                 }`}
               />
               <span className="text-sm text-muted-foreground">
                 {managedTTSIncluded === false
                   ? 'Browser voice · Free'
-                  : googleTTSAvailable
+                  : googleTTSAvailable || supertonicAvailable
                     ? 'Managed voice available'
                     : 'Using browser voice'}
               </span>
@@ -195,16 +240,23 @@ export default function TTSSettings() {
           <label className="block text-sm font-medium text-foreground">Voice Engine</label>
           <p className="mb-2 text-xs text-muted-foreground">
             {managedTTSIncluded === false
-              ? 'Browser speech stays free and works across reading, practice, and dictation. Cloud adds a consistent managed voice.'
-              : 'Managed voices offer more consistent pronunciation; your browser voice is always available.'}
+              ? 'Browser speech stays free and works across reading, practice, and dictation. Cloud adds a consistent managed voice. Supertonic runs locally on the server and is free on all plans.'
+              : 'Managed voices offer more consistent pronunciation; your browser voice is always available. Supertonic runs locally on the server and is free on all plans.'}
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               disabled={!googleTTSAvailable}
               onClick={() => handleTTSModeChanged('google')}
               variant={currentTTSMode === 'google' ? 'default' : 'secondary'}
             >
-              Managed voice
+              Managed voice (Google)
+            </Button>
+            <Button
+              disabled={!supertonicAvailable || !supertonicSupported}
+              onClick={() => handleTTSModeChanged('supertonic')}
+              variant={currentTTSMode === 'supertonic' ? 'default' : 'secondary'}
+            >
+              Supertonic (Local AI)
             </Button>
             <Button
               onClick={() => handleTTSModeChanged('browser')}
@@ -220,9 +272,30 @@ export default function TTSSettings() {
                 Upgrade to Cloud
               </a>
               . Adding your own AI key does not change audio because voice usage is hosted by
-              Lector.
+              Lector. Supertonic is available free on all plans for supported languages.
             </p>
           )}
+        </div>
+      )}
+
+      {currentTTSMode === 'supertonic' && supertonicSupported && (
+        <div>
+          <label className="block text-sm font-medium text-foreground">Supertonic Voice</label>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Select a voice style for Supertonic TTS. All voices are included locally.
+          </p>
+          <select
+            value={selectedSupertonicVoice}
+            onChange={(e) => handleSupertonicVoiceChange(e.target.value as SupertonicVoiceId)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            data-testid="supertonic-voice-select"
+          >
+            {SUPERTONIC_VOICES.map((voice) => (
+              <option key={voice.id} value={voice.id}>
+                {voice.label}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

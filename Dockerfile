@@ -118,6 +118,25 @@ RUN bun install --frozen-lockfile --production
 
 COPY api/src ./src
 
+# ── Supertonic model fetch stage ──────────────────────────────────────────────
+# Download Supertonic v3 models (~400 MB) from Hugging Face. The models include
+# the ONNX model and voice style embeddings (M1–M5, F1–F5). This runs in a
+# separate stage so the model assets can be copied into the runner image.
+FROM alpine:3 AS supertonic
+ARG SUPERTONIC_VERSION=main
+RUN apk add --no-cache curl git git-lfs
+RUN git lfs install
+WORKDIR /supertonic
+# Clone the supertonic-3 repo with LFS files (models)
+RUN git clone --depth 1 --branch ${SUPERTONIC_VERSION} https://huggingface.co/supertone-inc/supertonic-3 . 2>/dev/null || \
+    (echo "Falling back to direct download..." && \
+     mkdir -p onnx voice_styles && \
+     curl -fL --retry 3 "https://huggingface.co/supertone-inc/supertonic-3/resolve/main/onnx/model.onnx" -o onnx/model.onnx && \
+     curl -fL --retry 3 "https://huggingface.co/supertone-inc/supertonic-3/resolve/main/onnx/config.json" -o onnx/config.json && \
+     for v in M1 M2 M3 M4 M5 F1 F2 F3 F4 F5; do \
+       curl -fL --retry 3 "https://huggingface.co/supertone-inc/supertonic-3/resolve/main/voice_styles/${v}.json" -o voice_styles/${v}.json; \
+     done)
+
 # ── Production stage ──
 FROM node:22-alpine AS runner
 
@@ -131,11 +150,14 @@ COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
 # an arm's-length subprocess (api/src/routes/tts.ts); GPL obligations don't
 # attach because nothing GPL is distributed with, or linked into, Lector code.
 # ffmpeg supplies ffprobe for the audio-import duration probe (#185) — same
-# arm's-length subprocess posture (api/src/lib/audio-probe.ts). Whisper itself
-# is deliberately NOT in this image: transcription talks to an external
-# OpenAI-compatible ASR server via ASR_URL (in-container Whisper would be
-# CPU-only inside Docker's VM — slow, and it pins the cores Lector shares).
-RUN apk add --no-cache espeak-ng ffmpeg
+# arm's-length subprocess posture (api/src/lib/audio-probe.ts).
+# ONNX Runtime native deps for Supertonic TTS (local neural TTS, #307 §3.2c
+# follow-on): libgomp for OpenMP, libstdc++ for C++ runtime. Supertonic models
+# (~400 MB) are downloaded at build time from Hugging Face.
+# Whisper itself is deliberately NOT in this image: transcription talks to an
+# external OpenAI-compatible ASR server via ASR_URL (in-container Whisper would
+# be CPU-only inside Docker's VM — slow, and it pins the cores Lector shares).
+RUN apk add --no-cache espeak-ng ffmpeg libgomp libstdc++
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -178,6 +200,10 @@ COPY languages ./languages
 
 # Copy entrypoint
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
+
+# Copy Supertonic model assets
+COPY --from=supertonic /supertonic/onnx /app/assets/supertonic/onnx
+COPY --from=supertonic /supertonic/voice_styles /app/assets/supertonic/voice_styles
 
 # Set ownership
 RUN chown -R nextjs:nodejs /app

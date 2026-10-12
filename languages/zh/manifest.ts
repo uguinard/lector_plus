@@ -111,13 +111,16 @@ export const zh = {
   // lowest-lettered Standard voice and is female, matching the tier + gender
   // af/de/es/pt/ru/pl use.
   ttsVoice: 'cmn-CN-Standard-A',
+  supertonicLang: 'zh',
+  supertonicVoice: 'M1',
   tatoebaCode: 'cmn',
   fallbackTts: ['zh-CN', 'zh-Hans', 'zh'],
   avoidWords: AVOID_WORDS,
   testPhrase: '你好！你好吗？',
   // Pinyin sits in the dictionary's `ipa` column (see the zh build profile), so
   // the reader can print it above each word (#289 4.4).
-  pronunciation: { audio: ['google'] as const, annotation: 'dictionary' as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const, annotation: 'dictionary' as const },
   script: {
     // zh-Hans, not bare zh: it selects Simplified glyph forms and the
     // Simplified ICU segmentation dictionary. Han unification means the tag is

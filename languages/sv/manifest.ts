@@ -136,11 +136,15 @@ export const sv = {
   // Lowest-lettered Standard voice, and female, matching the tier and gender
   // af/de/es/cs use. sv-SE has Standard A–D.
   ttsVoice: 'sv-SE-Standard-A',
+  supertonicLang: 'sv',
+  supertonicVoice: 'M1',
   tatoebaCode: 'swe',
   fallbackTts: ['sv', 'sv-SE'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Hej! Hur mår du?',
-  pronunciation: { audio: ['google'] as const },
+  // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'sv',
     direction: 'ltr' as const,

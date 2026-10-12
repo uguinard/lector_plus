@@ -110,7 +110,7 @@ export interface ProseDefaults {
 }
 
 /** Server-side TTS engines a language can be spoken by (#307 §3.2). */
-export type TtsEngine = 'google' | 'espeak';
+export type TtsEngine = 'google' | 'espeak' | 'supertonic';
 
 /**
  * Pronunciation capability (#307 §3.2) — two orthogonal axes, because a
@@ -289,6 +289,10 @@ export interface LanguageConfig {
   ttsCode?: string;
   /** Preferred Google Cloud TTS voice. Required when 'google' ∈ pronunciation.audio. */
   ttsVoice?: string;
+  /** Supertonic TTS language code (e.g., 'en', 'de'). Required when 'supertonic' ∈ pronunciation.audio. */
+  supertonicLang?: string;
+  /** Preferred Supertonic voice (M1–M5, F1–F5). Required when 'supertonic' ∈ pronunciation.audio. */
+  supertonicVoice?: string;
   /** Tatoeba 3-letter code, e.g. "deu". */
   tatoebaCode: string;
   /** Browser-TTS fallback locales, most-specific first. Only meaningful for 'google' languages. */

@@ -163,12 +163,14 @@ export const ko = {
   // The lowest-lettered Standard voice, and female, matching the tier and
   // gender af/de/es/pt/ru/pl/zh/ja use.
   ttsVoice: 'ko-KR-Standard-A',
+  supertonicLang: 'ko',
+  supertonicVoice: 'M1',
   tatoebaCode: 'kor',
   fallbackTts: ['ko-KR', 'ko'],
   avoidWords: AVOID_WORDS,
   testPhrase: '안녕하세요. 한국어를 공부하고 있어요.',
   pronunciation: {
-    audio: ['google'] as const,
+    audio: ['google', 'supertonic'] as const,
     // No annotation. Hangul is featural and phonemic, so the spelling gives the
     // pronunciation syllable for syllable, and the same reason keeps the layer
     // off Esperanto. zh and ja opt in because Han characters hide the reading.

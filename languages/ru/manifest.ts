@@ -201,12 +201,15 @@ export const ru = {
   // Standard-A tier + gender used by af/de/es/pt. Verified against Google's
   // supported-voices list.
   ttsVoice: 'ru-RU-Standard-A',
+  supertonicLang: 'ru',
+  supertonicVoice: 'M1',
   tatoebaCode: 'rus',
   fallbackTts: ['ru', 'ru-RU'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Привет! Как дела?',
   // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
-  pronunciation: { audio: ['google'] as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'ru',
     direction: 'ltr' as const,

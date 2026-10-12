@@ -202,12 +202,15 @@ export const pl = {
   // Standard voice and it is female, matching the tier + gender af/de/es/pt/ru
   // use. Verified against the live voices API 2026-08-08.
   ttsVoice: 'pl-PL-Standard-F',
+  supertonicLang: 'pl',
+  supertonicVoice: 'M1',
   tatoebaCode: 'pol',
   fallbackTts: ['pl', 'pl-PL'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Cześć! Jak się masz?',
   // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
-  pronunciation: { audio: ['google'] as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'pl',
     direction: 'ltr' as const,

@@ -72,6 +72,9 @@ export const TENANT_TABLES = [
   // with its lessons. (The audio files under DATA_DIR/audio stay on disk and
   // are keyed by lessonId, which adoption preserves.)
   'transcript_segments',
+  // Phrase highlights created by the user (#307 §4.2): user's personal
+  // annotations on lesson text.
+  'userPhraseHighlights',
 ] as const;
 
 export type TenantTable = (typeof TENANT_TABLES)[number];

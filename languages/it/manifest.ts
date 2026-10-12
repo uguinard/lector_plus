@@ -215,12 +215,15 @@ export const it = {
   // it-IT's current Standard voices are E (female) and F (male); use the
   // female Standard voice to match the other language packs' default.
   ttsVoice: 'it-IT-Standard-E',
+  supertonicLang: 'it',
+  supertonicVoice: 'M1',
   tatoebaCode: 'ita',
   fallbackTts: ['it', 'it-IT', 'it-CH'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Ciao! Come stai?',
   // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
-  pronunciation: { audio: ['google'] as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'it',
     direction: 'ltr' as const,

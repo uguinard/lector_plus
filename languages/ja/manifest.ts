@@ -120,6 +120,8 @@ export const ja = {
   // The lowest-lettered Standard voice, and female, matching the tier and
   // gender af/de/es/pt/ru/pl/zh use.
   ttsVoice: 'ja-JP-Standard-A',
+  supertonicLang: 'ja',
+  supertonicVoice: 'M1',
   tatoebaCode: 'jpn',
   fallbackTts: ['ja-JP', 'ja'],
   avoidWords: AVOID_WORDS,
@@ -132,7 +134,7 @@ export const ja = {
   // もと in 本を正す, and a dictionary holds one reading per headword. It also has
   // no headword for 読ん at all. See annotation.
   pronunciation: {
-    audio: ['google'] as const,
+    audio: ['google', 'supertonic'] as const,
     annotation: 'analyser' as const,
     // Han only. A kana word already shows its reading, and several single kana
     // are archaic kanji-words in the dictionary, so a lookup returns something

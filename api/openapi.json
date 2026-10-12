@@ -62,7 +62,7 @@
     },
     {
       "name": "Data",
-      "description": "Export and restore the account’s learning data."
+      "description": "Export and restore the account's learning data."
     },
     {
       "name": "Chat",
@@ -10560,7 +10560,7 @@
       "post": {
         "operationId": "postApiTts",
         "summary": "Synthesize speech",
-        "description": "Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs.",
+        "description": "Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs. The `engine` parameter selects the TTS engine: `google` (Cloud TTS, metered), `supertonic` (local neural TTS, unmetered), or `espeak` (formant synthesis for Esperanto). When omitted, the language pack's default engine order is used.",
         "tags": [
           "Language help"
         ],
@@ -10581,6 +10581,19 @@
                   },
                   "language": {
                     "type": "string"
+                  },
+                  "engine": {
+                    "type": "string",
+                    "enum": [
+                      "google",
+                      "supertonic",
+                      "espeak"
+                    ],
+                    "description": "TTS engine to use. Defaults to pack's first available engine."
+                  },
+                  "voice": {
+                    "type": "string",
+                    "description": "Voice identifier. For Supertonic: M1-M5, F1-F5."
                   }
                 },
                 "required": [
@@ -10608,6 +10621,10 @@
                         "audio/mp3",
                         "audio/wav"
                       ]
+                    },
+                    "cached": {
+                      "type": "boolean",
+                      "description": "Whether the audio was served from cache."
                     }
                   }
                 }
@@ -11442,6 +11459,91 @@
           }
         ],
         "x-token-scope": "vocab:write"
+      }
+    },
+    "/api/vocab/by-text": {
+      "get": {
+        "operationId": "getApiVocabByText",
+        "summary": "Find a vocabulary entry by its text",
+        "description": "Returns the saved vocabulary entry matching the given text and language, if any.",
+        "tags": [
+          "Vocabulary"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LanguageQuery"
+          },
+          {
+            "name": "text",
+            "in": "query",
+            "required": true,
+            "description": "The word or phrase to look up.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching entry, or null if not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabEntry"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token does not carry the scope this endpoint needs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A plan limit or a rate limit stopped the call.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanLimitError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The API failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PersonalAccessToken": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-token-scope": "vocab:read"
       }
     },
     "/api/vocab/update-srs": {

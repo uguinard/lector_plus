@@ -180,11 +180,15 @@ export const hi = {
   // Lowest-lettered Standard voice, and female, matching the tier and gender
   // af/de/es/pt/ru/pl use. Verified against Google's supported-voices list.
   ttsVoice: 'hi-IN-Standard-A',
+  supertonicLang: 'hi',
+  supertonicVoice: 'M1',
   tatoebaCode: 'hin',
   fallbackTts: ['hi', 'hi-IN'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'नमस्ते! आप कैसे हैं?',
-  pronunciation: { audio: ['google'] as const },
+  // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'hi',
     direction: 'ltr' as const,

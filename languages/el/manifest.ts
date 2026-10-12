@@ -113,11 +113,15 @@ export const el = {
   ttsCode: 'el-GR',
   // el-GR has one Standard voice. The issue names it.
   ttsVoice: 'el-GR-Standard-B',
+  supertonicLang: 'el',
+  supertonicVoice: 'M1',
   tatoebaCode: 'ell',
   fallbackTts: ['el', 'el-GR'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Γεια σου! Τι κάνεις;',
-  pronunciation: { audio: ['google'] as const },
+  // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'el',
     direction: 'ltr' as const,

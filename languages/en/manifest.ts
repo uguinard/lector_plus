@@ -143,12 +143,15 @@ export const en = {
   flag: '\u{1F1FA}\u{1F1F8}',
   ttsCode: 'en-US',
   ttsVoice: 'en-US-Standard-A',
+  supertonicLang: 'en',
+  supertonicVoice: 'M1',
   tatoebaCode: 'eng',
   fallbackTts: ['en', 'en-US', 'en-GB'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Hello, how are you?',
   // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
-  pronunciation: { audio: ['google'] as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   // Monolingual learning: English-to-English definitions, not translations (#470).
   monolingual: true,
   script: {

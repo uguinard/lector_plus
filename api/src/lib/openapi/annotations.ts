@@ -97,10 +97,11 @@ export const tags = [
   { name: 'Statistics', description: 'Daily activity, streaks and fluency estimates.' },
   { name: 'Anki', description: 'Card queue and review sync for the Anki add-on.' },
   { name: 'Settings', description: 'Account preferences and provider configuration.' },
-  { name: 'Data', description: 'Export and restore the account’s learning data.' },
+  { name: 'Data', description: "Export and restore the account's learning data." },
   { name: 'Chat', description: 'Conversation practice with the language model.' },
   { name: 'Onboarding', description: 'Guided first-run state and starter content.' },
   { name: 'Service', description: 'Health and deployment information.' },
+  { name: 'Highlights', description: 'User phrase highlights in lessons.' },
 ];
 
 /** Reusable parameters. `sharedParams` entries name one of these. */
@@ -1138,6 +1139,26 @@ const vocabOps: Record<string, OperationDoc> = {
     pathParams: { id: 'Vocabulary entry identifier.' },
     responses: { '200': { description: 'The entry is deleted.', schema: ref('Success') } },
   },
+  'GET /api/vocab/by-text': {
+    summary: 'Find a vocabulary entry by its text',
+    description: 'Returns the saved vocabulary entry matching the given text and language, if any.',
+    tag: 'Vocabulary',
+    sharedParams: LANG,
+    query: [
+      {
+        name: 'text',
+        description: 'The word or phrase to look up.',
+        schema: { type: 'string' },
+        required: true,
+      },
+    ],
+    responses: {
+      '200': {
+        description: 'The matching entry, or null if not found.',
+        schema: ref('VocabEntry'),
+      },
+    },
+  },
   'POST /api/vocab/bulk-delete': {
     summary: 'Delete saved entries in a batch',
     description:
@@ -1851,7 +1872,7 @@ const languageHelpOps: Record<string, OperationDoc> = {
   'POST /api/tts': {
     summary: 'Synthesize speech',
     description:
-      'Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs.',
+      "Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs. The `engine` parameter selects the TTS engine: `google` (Cloud TTS, metered), `supertonic` (local neural TTS, unmetered), or `espeak` (formant synthesis for Esperanto). When omitted, the language pack's default engine order is used.",
     tag: 'Language help',
     requestBody: {
       required: true,
@@ -1861,6 +1882,12 @@ const languageHelpOps: Record<string, OperationDoc> = {
           text: { type: 'string', description: 'At most 5,000 bytes.' },
           rate: { type: 'number', description: 'Speaking rate. The default is 0.9.' },
           language: { type: 'string' },
+          engine: {
+            type: 'string',
+            enum: ['google', 'supertonic', 'espeak'],
+            description: "TTS engine to use. Defaults to pack's first available engine.",
+          },
+          voice: { type: 'string', description: 'Voice identifier. For Supertonic: M1-M5, F1-F5.' },
         },
         required: ['text'],
       },
@@ -1873,6 +1900,7 @@ const languageHelpOps: Record<string, OperationDoc> = {
           properties: {
             audioContent: { type: 'string', description: 'Base64 audio.' },
             contentType: { type: 'string', enum: ['audio/mp3', 'audio/wav'] },
+            cached: { type: 'boolean', description: 'Whether the audio was served from cache.' },
           },
         },
       },
@@ -2737,7 +2765,21 @@ const highlightsOps: Record<string, OperationDoc> = {
           phraseText: { type: 'string' },
           wordIds: { type: 'array', items: { type: 'string' }, minItems: 2 },
           languageCode: { type: 'string' },
-          learningStage: { type: 'string', enum: ['new', 'level1', 'level2', 'level3', 'level4', 'level5', 'level6', 'level7', 'known', 'ignored'] },
+          learningStage: {
+            type: 'string',
+            enum: [
+              'new',
+              'level1',
+              'level2',
+              'level3',
+              'level4',
+              'level5',
+              'level6',
+              'level7',
+              'known',
+              'ignored',
+            ],
+          },
         },
       },
     },
@@ -2799,8 +2841,7 @@ const highlightsOps: Record<string, OperationDoc> = {
   },
   'POST /api/highlights/restore': {
     summary: 'Restore highlights for a lesson',
-    description:
-      'Returns all highlights that contain words from the given lesson.',
+    description: 'Returns all highlights that contain words from the given lesson.',
     tag: 'Highlights',
     requestBody: {
       required: true,

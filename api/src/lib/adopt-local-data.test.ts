@@ -44,6 +44,7 @@ function createSchema(db: Database): void {
     CREATE TABLE anki_collections (userId TEXT PRIMARY KEY, crt INTEGER NOT NULL DEFAULT 0, firstSeenAt TEXT NOT NULL DEFAULT '', lastSeenAt TEXT NOT NULL DEFAULT '');
     CREATE TABLE transcript_segments (userId TEXT NOT NULL DEFAULT 'local', lessonId TEXT NOT NULL, idx INTEGER NOT NULL, PRIMARY KEY (userId, lessonId, idx));
     CREATE TABLE user_provider_credentials (userId TEXT NOT NULL, provider TEXT NOT NULL, ciphertext TEXT NOT NULL, model TEXT NOT NULL, PRIMARY KEY (userId, provider));
+    CREATE TABLE userPhraseHighlights (userId TEXT NOT NULL DEFAULT 'local', phraseText TEXT NOT NULL, languageCode TEXT NOT NULL DEFAULT 'af', learningStage INTEGER NOT NULL DEFAULT 0, createdAt TEXT NOT NULL DEFAULT '', PRIMARY KEY (userId, phraseText, languageCode));
     CREATE TABLE "user"           (id TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT);
   `);
 }

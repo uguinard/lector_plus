@@ -119,11 +119,15 @@ export const id = {
   // Lowest-lettered Standard voice, and female, matching the tier and gender
   // af/de/es/pt/cs use.
   ttsVoice: 'id-ID-Standard-A',
+  supertonicLang: 'id',
+  supertonicVoice: 'M1',
   tatoebaCode: 'ind',
   fallbackTts: ['id', 'id-ID'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Halo! Apa kabar?',
-  pronunciation: { audio: ['google'] as const },
+  // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'id',
     direction: 'ltr' as const,

@@ -223,12 +223,15 @@ export const tr = {
   // Standard-A tier + gender used by af/de/es/pt/ru. Verified against
   // Google's supported-voices list.
   ttsVoice: 'tr-TR-Standard-A',
+  supertonicLang: 'tr',
+  supertonicVoice: 'M1',
   tatoebaCode: 'tur',
   fallbackTts: ['tr', 'tr-TR'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Merhaba! Nasılsın?',
   // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
-  pronunciation: { audio: ['google'] as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'tr',
     direction: 'ltr' as const,

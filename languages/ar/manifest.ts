@@ -148,11 +148,15 @@ export const ar = {
   // the tier and gender af/de/es/pt/ru/pl/tr/zh use.
   ttsCode: 'ar-XA',
   ttsVoice: 'ar-XA-Standard-A',
+  supertonicLang: 'ar',
+  supertonicVoice: 'M1',
   tatoebaCode: 'ara',
   fallbackTts: ['ar-SA', 'ar-EG', 'ar'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'مرحبا! كيف حالك؟',
-  pronunciation: { audio: ['google'] as const },
+  // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'ar',
     // The first rtl pack. ReaderArticle and TranscriptReader already read this

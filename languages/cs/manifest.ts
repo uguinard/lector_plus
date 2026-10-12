@@ -211,12 +211,15 @@ export const cs = {
   // gender af/de/es/pt/ru/pl use. Verified against the live voices API
   // 2026-08-08.
   ttsVoice: 'cs-CZ-Standard-B',
+  supertonicLang: 'cs',
+  supertonicVoice: 'M1',
   tatoebaCode: 'ces',
   fallbackTts: ['cs', 'cs-CZ'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Ahoj! Jak se máš?',
   // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
-  pronunciation: { audio: ['google'] as const },
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'cs',
     direction: 'ltr' as const,

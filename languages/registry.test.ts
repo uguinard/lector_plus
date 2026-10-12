@@ -13,7 +13,9 @@ describe('registry pronunciation conformance', () => {
       if (audio === 'none') continue;
       expect(audio.length, `${lang.code} audio list must not be empty`).toBeGreaterThan(0);
       for (const engine of audio) {
-        expect(['google', 'espeak'], `${lang.code} engine ${engine}`).toContain(engine);
+        expect(['google', 'espeak', 'supertonic'], `${lang.code} engine ${engine}`).toContain(
+          engine,
+        );
       }
     }
   });
@@ -116,10 +118,10 @@ describe('registry pronunciation conformance', () => {
   it('Finnish, Hungarian and Norwegian keep the Polish control-case seams and name their voices', () => {
     expect(LANGUAGES.fi.ttsCode).toBe('fi-FI');
     expect(LANGUAGES.fi.ttsVoice).toBe('fi-FI-Standard-B');
-    expect(LANGUAGES.fi.pronunciation.audio).toEqual(['google']);
+    expect(LANGUAGES.fi.pronunciation.audio).toEqual(['google', 'supertonic']);
     expect(LANGUAGES.hu.ttsCode).toBe('hu-HU');
     expect(LANGUAGES.hu.ttsVoice).toBe('hu-HU-Standard-B');
-    expect(LANGUAGES.hu.pronunciation.audio).toEqual(['google']);
+    expect(LANGUAGES.hu.pronunciation.audio).toEqual(['google', 'supertonic']);
     expect(LANGUAGES.nb.ttsCode).toBe('nb-NO');
     expect(LANGUAGES.nb.ttsVoice).toBe('nb-NO-Standard-A');
     expect(LANGUAGES.nb.pronunciation.audio).toEqual(['google']);
@@ -136,7 +138,7 @@ describe('registry pronunciation conformance', () => {
     expect(pack.script.practiceLeniency).toBe('fold-marks');
     expect(pack.ttsCode).toBe('el-GR');
     expect(pack.ttsVoice).toBe('el-GR-Standard-B');
-    expect(pack.pronunciation.audio).toEqual(['google']);
+    expect(pack.pronunciation.audio).toEqual(['google', 'supertonic']);
     expect(LANGUAGES.grc.pronunciation.audio).toBe('none');
     expect(LANGUAGES.grc.name).toBe('Koine Greek');
     expect(LANGUAGES.grc.script.practiceLeniency).toBe('fold-marks');
@@ -159,7 +161,7 @@ describe('registry pronunciation conformance', () => {
     expect(pack.script.extraWordChars).toBe('\u200C\u200D');
     expect(pack.ttsCode).toBe('hi-IN');
     expect(pack.ttsVoice).toBe('hi-IN-Standard-A');
-    expect(pack.pronunciation.audio).toEqual(['google']);
+    expect(pack.pronunciation.audio).toEqual(['google', 'supertonic']);
   });
 
   it('esperanto is espeak-voiced with a rule-generated IPA gloss', () => {

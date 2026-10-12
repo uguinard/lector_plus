@@ -46,13 +46,16 @@ export function hasAudio(): boolean {
 /**
  * Whether a speaker control should render for the active language in this
  * browser: 'none' languages never speak; server-engine languages (eo →
- * eSpeak NG) always can, independent of browser voices; Google languages
- * keep the historical browser-TTS availability check (their fallback path).
+ * eSpeak NG, or Supertonic-supported languages) always can, independent of
+ * browser voices; Google-only languages keep the historical browser-TTS
+ * availability check (their fallback path).
  */
 export function canSpeak(): boolean {
   const audio = activeLangConfig().pronunciation.audio;
   if (audio === 'none') return false;
-  if (!audio.includes('google')) return true;
+  // Languages with any server-side engine (espeak or supertonic) always work
+  if (audio.includes('espeak') || audio.includes('supertonic')) return true;
+  // Google languages fall back to browser TTS availability
   return isTTSAvailable();
 }
 
@@ -93,7 +96,7 @@ function migrateVoicePreference(): void {
 }
 
 // TTS modes
-export type TTSMode = 'google' | 'browser';
+export type TTSMode = 'google' | 'supertonic' | 'browser';
 
 /**
  * Check if the browser supports the Web Speech API
@@ -250,15 +253,20 @@ export function getCurrentVoiceName(languageCode?: string): string | undefined {
 /**
  * Speak via the server TTS route. The API dispatches to the engine the active
  * language declares (`pronunciation.audio`): Google for the national-language
- * packs, self-hosted eSpeak NG for Esperanto (#307 §3.2c).
+ * packs, self-hosted eSpeak NG for Esperanto, self-hosted Supertonic for
+ * supported languages (#307 §3.2c follow-on).
  * @returns true if successful, false if the caller may fall back to browser TTS
  */
-async function speakWithServer(text: string, rate: number): Promise<boolean> {
+async function speakWithServer(
+  text: string,
+  rate: number,
+  engine?: 'google' | 'supertonic',
+): Promise<boolean> {
   try {
     const response = await apiFetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, rate, language: getActiveLanguage() }),
+      body: JSON.stringify({ text, rate, language: getActiveLanguage(), engine }),
     });
 
     const data = await response.json();
@@ -333,7 +341,7 @@ function speakWithBrowser(text: string, rate: number): void {
  * - server-engine-only languages (eo → eSpeak NG) — always the server route,
  *   unmetered, and NEVER browser TTS: there is no matching browser voice, so
  *   a failure surfaces instead of mis-speaking in the wrong language.
- * - Google languages — managed TTS when entitled, browser TTS otherwise
+ * - Google/Supertonic languages — managed TTS when entitled, browser TTS otherwise
  *   (existing behavior).
  * @param text - The text to speak
  * @param rate - Speech rate (default 0.9 for clearer learning)
@@ -342,7 +350,7 @@ export async function speak(text: string, rate: number = DEFAULT_RATE): Promise<
   const audio = activeLangConfig().pronunciation.audio;
   if (audio === 'none') return;
 
-  if (!audio.includes('google')) {
+  if (!audio.includes('google') && !audio.includes('supertonic')) {
     // eSpeak-only language: no plan gating (synthesis is zero-marginal-cost
     // and unmetered on every tier — #307 §3.2c) and no browser fallback.
     const success = await speakWithServer(text, rate);
@@ -363,8 +371,16 @@ export async function speak(text: string, rate: number = DEFAULT_RATE): Promise<
         return;
       }
     }
-    const success = await speakWithServer(text, rate);
+    const success = await speakWithServer(text, rate, 'google');
     if (success) return;
+  }
+
+  if (mode === 'supertonic') {
+    // Supertonic is unmetered and available on all tiers (including Free).
+    // No entitlement check needed.
+    const success = await speakWithServer(text, rate, 'supertonic');
+    if (success) return;
+    // On failure, fall through to browser TTS
   }
 
   speakWithBrowser(text, rate);
@@ -464,6 +480,24 @@ export async function isGoogleTTSConfigured(): Promise<boolean> {
     });
     const data = await response.json();
     return !data.fallback;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if Supertonic TTS is available on the server
+ * Makes a test request with engine=supertonic
+ */
+export async function isSupertonicAvailable(): Promise<boolean> {
+  try {
+    const response = await apiFetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: 'test', engine: 'supertonic' }),
+    });
+    const data = await response.json();
+    return !data.fallback && !data.error;
   } catch {
     return false;
   }

@@ -24,6 +24,7 @@
     "hono": "^4.12.25",
     "jsonrepair": "^3.14.0",
     "linkedom": "^0.18.12",
+    "onnxruntime-node": "^1.19.0",
     "uuid": "^14.0.0",
     "yaml": "^2.8.3"
   },

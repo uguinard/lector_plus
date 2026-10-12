@@ -133,11 +133,15 @@ export const fi = {
   ttsCode: 'fi-FI',
   // fi-FI has one Standard voice. The issue names it.
   ttsVoice: 'fi-FI-Standard-B',
+  supertonicLang: 'fi',
+  supertonicVoice: 'M1',
   tatoebaCode: 'fin',
   fallbackTts: ['fi', 'fi-FI'],
   avoidWords: AVOID_WORDS,
   testPhrase: 'Hei! Mitä kuuluu?',
-  pronunciation: { audio: ['google'] as const },
+  // Google is the canonical voice; browser TTS layers on client-side (#307 §3.2).
+  // Supertonic (local neural TTS) is also available for this language.
+  pronunciation: { audio: ['google', 'supertonic'] as const },
   script: {
     bcp47: 'fi',
     direction: 'ltr' as const,
