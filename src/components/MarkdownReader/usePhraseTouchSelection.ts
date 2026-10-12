@@ -163,6 +163,23 @@ export function usePhraseTouchSelection(
         unpaint(painted);
       }, 0);
 
+      // Apply rectangle border around the phrase selection on the first/last word
+      // when two or more words are selected (sentence-level highlight).
+      // Border color depends on the learning level of the first word.
+      if (selected.length >= 2) {
+        const first = selected[0];
+        const last = selected[selected.length - 1];
+        const wordState = first.getAttribute('data-word-state') || 'new';
+        // Set data attributes (not classes) to match the CSS attribute selectors
+        first.setAttribute('data-phrase-border', wordState);
+        last.setAttribute('data-phrase-border', wordState);
+        // Remove after one render cycle to avoid persisting beyond the selection
+        setTimeout(() => {
+          first.removeAttribute('data-phrase-border');
+          last.removeAttribute('data-phrase-border');
+        }, 0);
+      }
+
       swallowClick = true;
       event.preventDefault();
       onPhraseRef.current(first, last);
