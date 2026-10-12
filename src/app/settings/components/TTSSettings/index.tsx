@@ -1,10 +1,23 @@
 import { Button } from '@/components/ui/button';
-import { getTTSMode, isGoogleTTSConfigured, setTTSMode, speak, TTSMode } from '@/lib/tts';
+import {
+  getTTSMode,
+  isGoogleTTSConfigured,
+  setTTSMode,
+  speak,
+  TTSMode,
+  getRecommendedVoices,
+  getBestVoice,
+  formatVoiceLabel,
+  setPreferredVoice,
+  getCurrentVoiceName,
+  waitForVoices as loadVoices,
+} from '@/lib/tts';
 import { lectorMode } from '@/lib/api-base';
 import { getEntitlements } from '@/lib/data-layer';
 import { useActiveLanguage } from '@/utils/hooks';
 import { ChangeEvent, useCallback, useEffect, useState } from 'react';
 import { SETTINGS_KEYS } from '../../constants';
+import type { RecommendedVoice } from '@/lib/browser-tts-voices';
 
 export default function TTSSettings() {
   const [ttsSpeed, setTTSSpeed] = useState(1);
@@ -12,6 +25,11 @@ export default function TTSSettings() {
   const [currentTTSMode, setCurrentTTSMode] = useState<TTSMode>('browser');
   const [googleTTSAvailable, setGoogleTTSAvailable] = useState<boolean | null>(null);
   const [managedTTSIncluded, setManagedTTSIncluded] = useState<boolean | null>(null);
+
+  // Voice selector state
+  const [recommendedVoices, setRecommendedVoices] = useState<RecommendedVoice[]>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>('');
+  const [loadingVoices, setLoadingVoices] = useState(false);
 
   // Languages without a Google voice (eo) always speak through the server's
   // self-hosted eSpeak NG engine — no engine choice, no plan gating, no
@@ -54,6 +72,35 @@ export default function TTSSettings() {
     void init();
   }, [espeakOnly]);
 
+  // Load browser voices when component mounts or language/mode changes
+  useEffect(() => {
+    if (currentTTSMode !== 'browser') return;
+
+    const load = async () => {
+      setLoadingVoices(true);
+      try {
+        const voices = await loadVoices();
+
+        // Get curated voices for the active language
+        const recommended = getRecommendedVoices(activeLang.code, voices);
+        setRecommendedVoices(recommended);
+
+        // Restore saved preference or pick best available
+        const saved = getCurrentVoiceName(activeLang.code);
+        let voiceName = saved;
+        if (!voiceName && recommended.length > 0) {
+          const best = getBestVoice(activeLang.code, voices);
+          voiceName = best?.name;
+        }
+        setSelectedVoiceName(voiceName ?? '');
+      } finally {
+        setLoadingVoices(false);
+      }
+    };
+
+    void load();
+  }, [currentTTSMode, activeLang.code]);
+
   const handleTTSModeChanged = (ttsMode: TTSMode) => {
     setCurrentTTSMode(ttsMode);
     setTTSMode(ttsMode);
@@ -65,6 +112,31 @@ export default function TTSSettings() {
     setTTSSpeed(newVal);
     localStorage.setItem(SETTINGS_KEYS.TTS_SPEED, `${newVal}`);
   };
+
+  const handleVoiceChange = (voiceName: string) => {
+    setSelectedVoiceName(voiceName);
+    setPreferredVoice(voiceName, activeLang.code);
+    // Test the new voice immediately
+    speak(activeLang.testPhrase, ttsSpeed);
+  };
+
+  const handleRefreshVoices = useCallback(async () => {
+    setLoadingVoices(true);
+    try {
+      const voices = await loadVoices();
+      const recommended = getRecommendedVoices(activeLang.code, voices);
+      setRecommendedVoices(recommended);
+      if (recommended.length > 0 && !selectedVoiceName) {
+        const best = getBestVoice(activeLang.code, voices);
+        if (best) {
+          setSelectedVoiceName(best.name);
+          setPreferredVoice(best.name, activeLang.code);
+        }
+      }
+    } finally {
+      setLoadingVoices(false);
+    }
+  }, [activeLang.code, selectedVoiceName]);
 
   const testSpeaking = useCallback(() => {
     // Every pack carries a sample sentence — no per-language switch needed.
@@ -150,6 +222,49 @@ export default function TTSSettings() {
               . Adding your own AI key does not change audio because voice usage is hosted by
               Lector.
             </p>
+          )}
+        </div>
+      )}
+
+      {currentTTSMode === 'browser' && !espeakOnly && (
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-foreground">Browser Voice</label>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRefreshVoices}
+              disabled={loadingVoices}
+            >
+              {loadingVoices ? 'Loading…' : 'Refresh voices'}
+            </Button>
+          </div>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Curated high-quality voices for {activeLang.name}. Install additional voices in your OS
+            settings if needed.
+          </p>
+          {loadingVoices ? (
+            <p className="text-xs text-muted-foreground">Loading voices…</p>
+          ) : recommendedVoices.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No recommended voices found — install a voice pack in OS settings{' '}
+              <Button variant="link" size="sm" className="h-auto p-0" onClick={handleRefreshVoices}>
+                Refresh
+              </Button>
+            </p>
+          ) : (
+            <select
+              value={selectedVoiceName}
+              onChange={(e) => handleVoiceChange(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              data-testid="browser-voice-select"
+            >
+              {recommendedVoices.map((voice) => (
+                <option key={voice.name} value={voice.name}>
+                  {formatVoiceLabel(voice)}
+                </option>
+              ))}
+            </select>
           )}
         </div>
       )}

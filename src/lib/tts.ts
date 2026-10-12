@@ -3,6 +3,12 @@
 import { getActiveLanguage, getEntitlements } from './data-layer';
 import { apiFetch, lectorMode } from './api-base';
 import { LANGUAGES, DEFAULT_LANGUAGE, type LanguageCode } from './languages';
+import {
+  getRecommendedVoices as getCuratedVoices,
+  getBestRecommendedVoice,
+  formatVoiceLabel,
+  type RecommendedVoice,
+} from './browser-tts-voices';
 
 // Default speech rate (1.0 is normal speed). Exported so callers that offer a
 // speed control (e.g. dictation practice) can scale relative to the app's
@@ -64,8 +70,27 @@ let voiceInitialized = false;
 let audioElement: HTMLAudioElement | null = null;
 
 // LocalStorage keys
-const VOICE_PREF_KEY = 'lector-tts-voice';
+const VOICE_PREF_KEY_PREFIX = 'lector-tts-voice-';
 const TTS_MODE_KEY = 'lector-tts-mode';
+
+function voicePrefKey(languageCode: string): string {
+  return `${VOICE_PREF_KEY_PREFIX}${languageCode}`;
+}
+
+/**
+ * Migrate old global voice preference to per-language keys.
+ * Runs once on first load.
+ */
+function migrateVoicePreference(): void {
+  if (typeof window === 'undefined') return;
+  const oldKey = 'lector-tts-voice';
+  const oldValue = localStorage.getItem(oldKey);
+  if (oldValue) {
+    const activeLang = getActiveLanguage();
+    localStorage.setItem(voicePrefKey(activeLang), oldValue);
+    localStorage.removeItem(oldKey);
+  }
+}
 
 // TTS modes
 export type TTSMode = 'google' | 'browser';
@@ -83,6 +108,7 @@ export function isTTSAvailable(): boolean {
  */
 export function getTTSMode(): TTSMode {
   if (typeof window === 'undefined') return 'browser';
+  migrateVoicePreference();
   return (localStorage.getItem(TTS_MODE_KEY) as TTSMode) || 'google';
 }
 
@@ -160,9 +186,9 @@ function getActiveLanguageVoice(): SpeechSynthesisVoice | undefined {
   }
 
   // Check for user's saved preference — but only reuse it if it still matches
-  // the active language. The saved name is global, so an Afrikaans voice must
-  // not be reused after the user switches the target language to German.
-  const savedVoiceName = localStorage.getItem(VOICE_PREF_KEY);
+  // the active language. The saved name is per-language, so an Afrikaans voice
+  // must not be reused after the user switches the target language to German.
+  const savedVoiceName = localStorage.getItem(voicePrefKey(getActiveLanguage()));
   if (savedVoiceName) {
     const savedVoice = voices.find((v) => v.name === savedVoiceName);
     if (savedVoice && matchesActiveLang(savedVoice)) {
@@ -187,7 +213,7 @@ function getActiveLanguageVoice(): SpeechSynthesisVoice | undefined {
 
   // Save the selection for next time
   if (cachedVoice) {
-    localStorage.setItem(VOICE_PREF_KEY, cachedVoice.name);
+    localStorage.setItem(voicePrefKey(getActiveLanguage()), cachedVoice.name);
   }
 
   return cachedVoice;
@@ -196,8 +222,9 @@ function getActiveLanguageVoice(): SpeechSynthesisVoice | undefined {
 /**
  * Set a specific voice by name (browser TTS)
  * @param voiceName - The name of the voice to use
+ * @param languageCode - The language to save the preference for (defaults to active language)
  */
-export function setPreferredVoice(voiceName: string): void {
+export function setPreferredVoice(voiceName: string, languageCode?: string): void {
   if (!isTTSAvailable()) return;
 
   const voices = window.speechSynthesis.getVoices();
@@ -206,15 +233,18 @@ export function setPreferredVoice(voiceName: string): void {
   if (voice) {
     cachedVoice = voice;
     voiceInitialized = true;
-    localStorage.setItem(VOICE_PREF_KEY, voiceName);
+    const lang = languageCode ?? getActiveLanguage();
+    localStorage.setItem(voicePrefKey(lang), voiceName);
   }
 }
 
 /**
- * Get the currently selected voice name
+ * Get the currently selected voice name for a language
+ * @param languageCode - The language to get the preference for (defaults to active language)
  */
-export function getCurrentVoiceName(): string | undefined {
-  return cachedVoice?.name || localStorage.getItem(VOICE_PREF_KEY) || undefined;
+export function getCurrentVoiceName(languageCode?: string): string | undefined {
+  const lang = languageCode ?? getActiveLanguage();
+  return cachedVoice?.name || localStorage.getItem(voicePrefKey(lang)) || undefined;
 }
 
 /**
@@ -411,12 +441,14 @@ export function waitForVoices(): Promise<SpeechSynthesisVoice[]> {
 }
 
 /**
- * Reset voice cache (useful if user wants to re-select)
+ * Reset voice cache for a language (useful if user wants to re-select)
+ * @param languageCode - The language to reset (defaults to active language)
  */
-export function resetVoiceCache(): void {
+export function resetVoiceCache(languageCode?: string): void {
   cachedVoice = undefined;
   voiceInitialized = false;
-  localStorage.removeItem(VOICE_PREF_KEY);
+  const lang = languageCode ?? getActiveLanguage();
+  localStorage.removeItem(voicePrefKey(lang));
 }
 
 /**
@@ -436,3 +468,42 @@ export async function isGoogleTTSConfigured(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Get curated/recommended voices for the active language (browser TTS).
+ * Uses Readium Speech curated voice lists filtered by quality.
+ * @param languageCode - The language to get voices for (defaults to active language)
+ * @param availableVoices - Optional pre-fetched voices; if omitted, fetches from browser
+ * @returns Array of recommended voices sorted by quality (best first)
+ */
+export function getRecommendedVoices(
+  languageCode?: string,
+  availableVoices?: SpeechSynthesisVoice[],
+): RecommendedVoice[] {
+  const lang = languageCode ?? getActiveLanguage();
+  const voices = availableVoices ?? (isTTSAvailable() ? window.speechSynthesis.getVoices() : []);
+  return getCuratedVoices(lang, voices);
+}
+
+/**
+ * Get the best available curated voice for a language.
+ * @param languageCode - The language to get the voice for (defaults to active language)
+ * @param availableVoices - Optional pre-fetched voices
+ * @returns The best matching SpeechSynthesisVoice or undefined
+ */
+export function getBestVoice(
+  languageCode?: string,
+  availableVoices?: SpeechSynthesisVoice[],
+): SpeechSynthesisVoice | undefined {
+  const lang = languageCode ?? getActiveLanguage();
+  const voices = availableVoices ?? (isTTSAvailable() ? window.speechSynthesis.getVoices() : []);
+  return getBestRecommendedVoice(lang, voices);
+}
+
+/**
+ * Format a recommended voice for display in the selector.
+ * e.g. "Emma (veryHigh, Edge)"
+ */
+export { formatVoiceLabel };
+
+export type { RecommendedVoice, VoiceQuality } from './browser-tts-voices';
