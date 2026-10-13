@@ -119,6 +119,7 @@ export const id = {
   // Lowest-lettered Standard voice, and female, matching the tier and gender
   // af/de/es/pt/cs use.
   ttsVoice: 'id-ID-Standard-A',
+  piperVoice: 'id_ID-gadis-medium',
   tatoebaCode: 'ind',
   fallbackTts: ['id', 'id-ID'],
   avoidWords: AVOID_WORDS,

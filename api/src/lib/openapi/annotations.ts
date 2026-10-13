@@ -1051,7 +1051,7 @@ const importOps: Record<string, OperationDoc> = {
 };
 
 const vocabOps: Record<string, OperationDoc> = {
-  'GET /api/vocab': {
+'GET /api/vocab': {
     summary: 'List saved words and phrases',
     tag: 'Vocabulary',
     sharedParams: LANG,
@@ -1074,6 +1074,13 @@ const vocabOps: Record<string, OperationDoc> = {
       },
     ],
     responses: { '200': { description: 'Matching entries.', schema: arrayOf('VocabEntry') } },
+  },
+  'GET /api/vocab/by-text': {
+    summary: 'Find vocab entry by text',
+    description: 'Find a vocabulary entry by its exact text content.',
+    tag: 'Vocabulary',
+    sharedParams: LANG,
+    responses: { '200': { description: 'The matching entry.', schema: ref('VocabEntry') } },
   },
   'POST /api/vocab': {
     summary: 'Save a word or phrase',
@@ -1851,7 +1858,7 @@ const languageHelpOps: Record<string, OperationDoc> = {
   'POST /api/tts': {
     summary: 'Synthesize speech',
     description:
-      'Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs.',
+      'Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs. mode: piper uses the self-hosted Piper TTS engine (unmetered, uncached, no API key required); available when the language pack has a piperVoice configured.',
     tag: 'Language help',
     requestBody: {
       required: true,
@@ -1860,7 +1867,8 @@ const languageHelpOps: Record<string, OperationDoc> = {
         properties: {
           text: { type: 'string', description: 'At most 5,000 bytes.' },
           rate: { type: 'number', description: 'Speaking rate. The default is 0.9.' },
-          language: { type: 'string' },
+          language: { type: 'string', description: 'Language pack code.' },
+          mode: { type: 'string', description: 'TTS engine: google, browser, or piper.' },
         },
         required: ['text'],
       },

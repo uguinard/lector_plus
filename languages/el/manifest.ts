@@ -113,6 +113,7 @@ export const el = {
   ttsCode: 'el-GR',
   // el-GR has one Standard voice. The issue names it.
   ttsVoice: 'el-GR-Standard-B',
+  piperVoice: 'el_GR-rapunzelina-medium',
   tatoebaCode: 'ell',
   fallbackTts: ['el', 'el-GR'],
   avoidWords: AVOID_WORDS,

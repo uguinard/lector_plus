@@ -18,6 +18,7 @@ export const pt = {
   // pt-BR-Standard-A is the female Standard voice (24 kHz), matching es/de/af's
   // Standard-A tier + gender. Verified against Google's supported-voices list.
   ttsVoice: 'pt-BR-Standard-A',
+  piperVoice: 'pt_PT-tugão-medium',
   tatoebaCode: 'por',
   fallbackTts: ['pt', 'pt-BR', 'pt-PT'],
   avoidWords: AVOID_WORDS,

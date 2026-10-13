@@ -71,6 +71,48 @@ async function synthesizeWithEspeak(text: string, voice: string, rate: number): 
   return Buffer.from(wav).toString('base64');
 }
 
+/**
+ * Synthesize via self-hosted Piper TTS — runs as a subprocess using the
+ * piper binary with an .onnx model file. Unmetered, uncached, no API key
+ * required. Model files are baked into the Docker image at build time under
+ * /app/piper-models/<voice>/model.onnx.
+ *
+ * Piper uses --length_scale for rate control (1.0 = normal, lower = faster).
+ * Client rate 0.25–4.0 maps to length_scale 2.0–0.5 (inverse, clamped).
+ */
+async function synthesizeWithPiper(text: string, voice: string, rate: number): Promise<string> {
+  // Map client rate (0.25–4.0) to piper's --length_scale.
+  // length_scale = 1.0 / rate, clamped to [0.5, 2.0].
+  const lengthScale = Math.max(0.5, Math.min(2.0, 1.0 / Math.max(0.01, rate)));
+
+  // Model path: /app/piper-models/<voice>/model.onnx
+  // The voice name from the language manifest (e.g. "af_ZA-mokone-medium")
+  // maps to a directory under /app/piper-models/.
+  const modelPath = `/app/piper-models/${voice}/model.onnx`;
+
+  const proc = Bun.spawn(
+    // -m: model path. --output_raw: output raw WAV to stdout.
+    ['piper', '-m', modelPath, '--output_raw'],
+    { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
+  );
+
+  proc.stdin.write(text);
+  await proc.stdin.end();
+
+  const [wav, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).arrayBuffer(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+
+  if (exitCode !== 0 || wav.byteLength === 0) {
+    throw new Error(
+      `piper exited ${exitCode} with ${wav.byteLength} bytes${stderr ? `: ${stderr.slice(0, 200)}` : ''}`,
+    );
+  }
+  return Buffer.from(wav).toString('base64');
+}
+
 const app = new Hono();
 
 // POST /api/tts — synthesize speech, returned as base64. Dispatches on the
@@ -90,7 +132,7 @@ app.post(
     let reservation: UsageReservation | null = null;
     let earned = false;
     try {
-      const { text, rate = 0.9, language } = await c.req.json();
+      const { text, rate = 0.9, language, mode } = await c.req.json();
 
       if (!text || typeof text !== 'string') {
         return c.json({ error: 'Text is required' }, 400);
@@ -106,6 +148,24 @@ app.post(
       if (audio === 'none') {
         // No `fallback: true`: nothing should speak this language (#307 §3.2a).
         return c.json({ error: 'This language has no synthesized voice', noAudio: true }, 404);
+      }
+
+      // Engine dispatch: packs declare their engines best-first. Today each
+      // pack declares a single engine (national languages `['google']`, eo
+      // `['espeak']`); the ordered-list form is the seam the §3.2c plan
+      // matrix (espeak as the free-tier engine everywhere) later slots into.
+      //
+// New: if mode is 'piper' and the language has a piperVoice configured,
+      // use the self-hosted Piper TTS engine (unmetered, uncached, no API key).
+      if (mode === 'piper' && langConfig.piperVoice) {
+        try {
+          const audioContent = await synthesizeWithPiper(text, langConfig.piperVoice, rate);
+          return c.json({ audioContent, contentType: 'audio/wav' });
+        } catch (err) {
+          console.error('Piper TTS error:', err);
+          // Return fallback flag so the client can use browser TTS.
+          return c.json({ fallback: true }, 500);
+        }
       }
 
       // Engine dispatch: packs declare their engines best-first. Today each

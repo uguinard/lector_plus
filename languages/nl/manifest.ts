@@ -34,6 +34,7 @@ export const nl = {
   // voice, matching af/de/es's Standard-A tier + gender. Verified against the
   // live voices API 2026-07-08 (nl-NL Standard voices: F female, G male).
   ttsVoice: 'nl-NL-Standard-F',
+  piperVoice: 'nl_NL-clara-medium',
   tatoebaCode: 'nld',
   fallbackTts: ['nl', 'nl-NL', 'nl-BE'],
   avoidWords: AVOID_WORDS,

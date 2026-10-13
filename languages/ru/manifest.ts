@@ -201,6 +201,7 @@ export const ru = {
   // Standard-A tier + gender used by af/de/es/pt. Verified against Google's
   // supported-voices list.
   ttsVoice: 'ru-RU-Standard-A',
+  piperVoice: 'ru_RU-irina-medium',
   tatoebaCode: 'rus',
   fallbackTts: ['ru', 'ru-RU'],
   avoidWords: AVOID_WORDS,

@@ -120,6 +120,7 @@ export const ja = {
   // The lowest-lettered Standard voice, and female, matching the tier and
   // gender af/de/es/pt/ru/pl/zh use.
   ttsVoice: 'ja-JP-Standard-A',
+  piperVoice: 'ja_JP-kurumi-medium',
   tatoebaCode: 'jpn',
   fallbackTts: ['ja-JP', 'ja'],
   avoidWords: AVOID_WORDS,

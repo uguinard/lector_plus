@@ -163,6 +163,7 @@ export const ko = {
   // The lowest-lettered Standard voice, and female, matching the tier and
   // gender af/de/es/pt/ru/pl/zh/ja use.
   ttsVoice: 'ko-KR-Standard-A',
+  piperVoice: 'ko_KR-hui-medium',
   tatoebaCode: 'kor',
   fallbackTts: ['ko-KR', 'ko'],
   avoidWords: AVOID_WORDS,

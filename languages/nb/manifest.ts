@@ -131,6 +131,7 @@ export const nb = {
   // Lowest-lettered Standard voice, and female, matching the tier and gender
   // af/de/es/cs/sv use. nb-NO has Standard A–F.
   ttsVoice: 'nb-NO-Standard-A',
+  piperVoice: 'nb_NO-talesynn-medium',
   tatoebaCode: 'nob',
   fallbackTts: ['nb', 'nb-NO', 'no', 'no-NO'],
   avoidWords: AVOID_WORDS,

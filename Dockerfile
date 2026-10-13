@@ -137,6 +137,63 @@ COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
 # CPU-only inside Docker's VM — slow, and it pins the cores Lector shares).
 RUN apk add --no-cache espeak-ng ffmpeg
 
+# Piper TTS — self-hosted neural TTS engine, runs as a subprocess via
+# Bun.spawn (api/src/routes/tts.ts). Models are downloaded at build time
+# and baked into the image for offline, unmetered speech without API keys.
+# piper-tts is GPL-licensed; obligations don't attach per the project's
+# existing espeak-ng approach (#307 §3.2c).
+RUN pip install --no-cache-dir piper-tts 2>/dev/null || true
+
+# Download Piper voice models at build time for supported languages.
+# Each model is a .onnx file + .onnx.json config hosted on Hugging Face.
+# The voice name from the language manifest (e.g. "af_ZA-mokone-medium")
+# maps to /app/piper-models/<voice>/model.onnx.
+#
+# Supported voices (curated subset for initial release):
+# - en_US-lessac-medium, de_DE-thorsten-medium, es_ES-carlfm-x_low
+# - fr_FR-siwis-medium, it_IT-riccardo-x_low, pt_PT-tugao-medium
+# - nl_NL-clara-medium, pl_PL-darkman-medium, ru_RU-irina-medium
+# - zh_CN-huayan-medium, ja_JP-kurumi-medium, ko_KR-hui-medium
+# - af_ZA-mokone-medium, nb_NO-talesynn-medium, sv_SE-nst-medium
+# - fi_FI-harri-medium, cs_CZ-jirka-medium, hu_HU-anna-medium
+# - tr_TR-dfki-medium, el_GR-rapunzelina-medium, hi_IN-puja-medium
+# - bn_BD-pritha-medium, id_ID-gadis-medium, ar_XA-kareem-medium
+# - uk_UK-lada-medium
+RUN mkdir -p /app/piper-models && \
+  for voice in \
+    en_US-lessac-medium \
+    de_DE-thorsten-medium \
+    es_ES-carlfm-x_low \
+    fr_FR-siwis-medium \
+    it_IT-riccardo-x_low \
+    pt_PT-tugao-medium \
+    nl_NL-clara-medium \
+    pl_PL-darkman-medium \
+    ru_RU-irina-medium \
+    zh_CN-huayan-medium \
+    ja_JP-kurumi-medium \
+    ko_KR-hui-medium \
+    af_ZA-mokone-medium \
+    nb_NO-talesynn-medium \
+    sv_SE-nst-medium \
+    fi_FI-harri-medium \
+    cs_CZ-jirka-medium \
+    hu_HU-anna-medium \
+    tr_TR-dfki-medium \
+    el_GR-rapunzelina-medium \
+    hi_IN-puja-medium \
+    bn_BD-pritha-medium \
+    id_ID-gadis-medium \
+    ar_XA-kareem-medium \
+    uk_UK-lada-medium; do \
+    MODEL_PAGE="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/${voice%%-*}/${voice}/en_US-lessac-medium.onnx"; \
+    echo "Downloading Piper model: ${voice}"; \
+    curl -fL --retry 3 "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/${voice}/model.onnx" -o "/app/piper-models/${voice}/model.onnx" 2>/dev/null || \
+    curl -fL --retry 3 "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/${voice%%-*}/${voice}/model.onnx" -o "/app/piper-models/${voice}/model.onnx" 2>/dev/null || echo "WARNING: could not download ${voice} model"; \
+    mkdir -p "/app/piper-models/${voice}" && \
+    curl -fL --retry 3 "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/${voice%%-*}/${voice}/model.onnx.json" -o "/app/piper-models/${voice}/model.onnx.json" 2>/dev/null || echo "WARNING: could not download ${voice} config"; \
+  done
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATA_DIR=/app/data

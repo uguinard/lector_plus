@@ -205,10 +205,11 @@ export const bn = {
   // and the written standard is shared, so the reading is correct even where
   // the accent is not local. Say so on the site rather than let a learner in
   // Dhaka discover it.
-  ttsCode: 'bn-IN',
+ttsCode: 'bn-IN',
   // Standard-A is the lowest-lettered Standard voice and is female, matching
-  // the tier and gender af/ar/de/es/pt/ru/pl/tr/zh use.
+  // the tier and gender af/ar/de/es/pt/ru/tr/zh use.
   ttsVoice: 'bn-IN-Standard-A',
+  piperVoice: 'bn_BD-pritha-medium',
   tatoebaCode: 'ben',
   fallbackTts: ['bn-IN', 'bn-BD', 'bn'],
   avoidWords: AVOID_WORDS,

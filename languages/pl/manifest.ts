@@ -202,6 +202,7 @@ export const pl = {
   // Standard voice and it is female, matching the tier + gender af/de/es/pt/ru
   // use. Verified against the live voices API 2026-08-08.
   ttsVoice: 'pl-PL-Standard-F',
+  piperVoice: 'pl_PL-darkman-medium',
   tatoebaCode: 'pol',
   fallbackTts: ['pl', 'pl-PL'],
   avoidWords: AVOID_WORDS,

@@ -21,6 +21,7 @@ export const fr = {
   // voice, matching es-ES-Standard-A's tier + gender. Verified against the live
   // voices API 2026-07-07.
   ttsVoice: 'fr-FR-Standard-F',
+  piperVoice: 'fr_FR-siwis-medium',
   tatoebaCode: 'fra',
   fallbackTts: ['fr', 'fr-FR', 'fr-CA'],
   avoidWords: AVOID_WORDS,

@@ -215,6 +215,7 @@ export const it = {
   // it-IT's current Standard voices are E (female) and F (male); use the
   // female Standard voice to match the other language packs' default.
   ttsVoice: 'it-IT-Standard-E',
+  piperVoice: 'it_IT-riccardo-x_low',
   tatoebaCode: 'ita',
   fallbackTts: ['it', 'it-IT', 'it-CH'],
   avoidWords: AVOID_WORDS,

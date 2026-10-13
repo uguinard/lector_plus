@@ -49,6 +49,7 @@ export const af = {
   flag: '\u{1F1FF}\u{1F1E6}',
   ttsCode: 'af-ZA',
   ttsVoice: 'af-ZA-Standard-A',
+  piperVoice: 'af_ZA-mokone-medium',
   tatoebaCode: 'afr',
   fallbackTts: ['af', 'nl-NL', 'nl'],
   avoidWords: AVOID_WORDS,

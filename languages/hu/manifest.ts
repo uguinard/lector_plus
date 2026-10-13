@@ -96,6 +96,7 @@ export const hu = {
   ttsCode: 'hu-HU',
   // hu-HU has one Standard voice. The issue names it.
   ttsVoice: 'hu-HU-Standard-B',
+  piperVoice: 'hu_HU-anna-medium',
   tatoebaCode: 'hun',
   fallbackTts: ['hu', 'hu-HU'],
   avoidWords: AVOID_WORDS,

@@ -148,6 +148,7 @@ export const ar = {
   // the tier and gender af/de/es/pt/ru/pl/tr/zh use.
   ttsCode: 'ar-XA',
   ttsVoice: 'ar-XA-Standard-A',
+  piperVoice: 'ar_XA-kareem-medium',
   tatoebaCode: 'ara',
   fallbackTts: ['ar-SA', 'ar-EG', 'ar'],
   avoidWords: AVOID_WORDS,

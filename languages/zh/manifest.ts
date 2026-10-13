@@ -111,6 +111,7 @@ export const zh = {
   // lowest-lettered Standard voice and is female, matching the tier + gender
   // af/de/es/pt/ru/pl use.
   ttsVoice: 'cmn-CN-Standard-A',
+  piperVoice: 'zh_CN-huayan-medium',
   tatoebaCode: 'cmn',
   fallbackTts: ['zh-CN', 'zh-Hans', 'zh'],
   avoidWords: AVOID_WORDS,

@@ -223,6 +223,7 @@ export const tr = {
   // Standard-A tier + gender used by af/de/es/pt/ru. Verified against
   // Google's supported-voices list.
   ttsVoice: 'tr-TR-Standard-A',
+  piperVoice: 'tr_TR-dfki-medium',
   tatoebaCode: 'tur',
   fallbackTts: ['tr', 'tr-TR'],
   avoidWords: AVOID_WORDS,

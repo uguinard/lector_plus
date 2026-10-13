@@ -13,6 +13,7 @@ export const de = {
   flag: '\u{1F1E9}\u{1F1EA}',
   ttsCode: 'de-DE',
   ttsVoice: 'de-DE-Standard-A',
+  piperVoice: 'de_DE-thorsten-medium',
   tatoebaCode: 'deu',
   fallbackTts: ['de', 'de-DE'],
   avoidWords: AVOID_WORDS,

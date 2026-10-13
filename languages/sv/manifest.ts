@@ -136,6 +136,7 @@ export const sv = {
   // Lowest-lettered Standard voice, and female, matching the tier and gender
   // af/de/es/cs use. sv-SE has Standard A–D.
   ttsVoice: 'sv-SE-Standard-A',
+  piperVoice: 'sv_SE-nst-medium',
   tatoebaCode: 'swe',
   fallbackTts: ['sv', 'sv-SE'],
   avoidWords: AVOID_WORDS,

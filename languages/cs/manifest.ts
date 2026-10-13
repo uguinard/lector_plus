@@ -211,6 +211,7 @@ export const cs = {
   // gender af/de/es/pt/ru/pl use. Verified against the live voices API
   // 2026-08-08.
   ttsVoice: 'cs-CZ-Standard-B',
+  piperVoice: 'cs_CZ-jirka-medium',
   tatoebaCode: 'ces',
   fallbackTts: ['cs', 'cs-CZ'],
   avoidWords: AVOID_WORDS,

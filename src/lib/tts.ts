@@ -93,7 +93,7 @@ function migrateVoicePreference(): void {
 }
 
 // TTS modes
-export type TTSMode = 'google' | 'browser';
+export type TTSMode = 'google' | 'browser' | 'piper';
 
 /**
  * Check if the browser supports the Web Speech API
@@ -255,10 +255,14 @@ export function getCurrentVoiceName(languageCode?: string): string | undefined {
  */
 async function speakWithServer(text: string, rate: number): Promise<boolean> {
   try {
+    const mode = getTTSMode();
+    const body = mode === 'piper'
+      ? { text, rate, language: getActiveLanguage(), mode: 'piper' }
+      : { text, rate, language: getActiveLanguage() };
     const response = await apiFetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, rate, language: getActiveLanguage() }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
@@ -342,6 +346,21 @@ export async function speak(text: string, rate: number = DEFAULT_RATE): Promise<
   const audio = activeLangConfig().pronunciation.audio;
   if (audio === 'none') return;
 
+  const mode = getTTSMode();
+
+  if (mode === 'piper') {
+    // Piper TTS: call the server with mode=piper; the API dispatches to
+    // the self-hosted Piper engine for languages with piperVoice configured.
+    // If the language doesn't have piperVoice, the API will fall back to
+    // browser TTS (returning { fallback: true }).
+    const success = await speakWithServer(text, rate);
+    // speakWithServer already handles the piper dispatch on the server side,
+    // and returns { fallback: true } on failure, which causes the client to
+    // fall back to browser TTS below.
+    if (success) return;
+    // Fall through to browser TTS if piper failed or is not configured.
+  }
+
   if (!audio.includes('google')) {
     // eSpeak-only language: no plan gating (synthesis is zero-marginal-cost
     // and unmetered on every tier — #307 §3.2c) and no browser fallback.
@@ -349,8 +368,6 @@ export async function speak(text: string, rate: number = DEFAULT_RATE): Promise<
     if (!success) console.error('TTS failed and this language has no browser fallback voice');
     return;
   }
-
-  const mode = getTTSMode();
 
   if (mode === 'google') {
     if (lectorMode() === 'cloud') {

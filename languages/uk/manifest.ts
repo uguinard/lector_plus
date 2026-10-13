@@ -215,6 +215,7 @@ export const uk = {
   // Standard voice, and it is female, matching the tier + gender those packs
   // use. Verified against the live voices API 2026-08-07.
   ttsVoice: 'uk-UA-Standard-B',
+  piperVoice: 'uk_UK-lada-medium',
   tatoebaCode: 'ukr',
   fallbackTts: ['uk', 'uk-UA'],
   avoidWords: AVOID_WORDS,

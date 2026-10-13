@@ -193,10 +193,10 @@ export default function TTSSettings() {
       ) : (
         <div>
           <label className="block text-sm font-medium text-foreground">Voice Engine</label>
-          <p className="mb-2 text-xs text-muted-foreground">
-            {managedTTSIncluded === false
-              ? 'Browser speech stays free and works across reading, practice, and dictation. Cloud adds a consistent managed voice.'
-              : 'Managed voices offer more consistent pronunciation; your browser voice is always available.'}
+<p className="mb-2 text-xs text-muted-foreground">
+              {managedTTSIncluded === false
+                ? 'Browser speech stays free and works across reading, practice, and dictation. Cloud adds a consistent managed voice.'
+                : 'Piper (offline, high quality) available; managed voices offer more consistent pronunciation; your browser voice is always available.'}
           </p>
           <div className="flex gap-2">
             <Button
@@ -205,6 +205,12 @@ export default function TTSSettings() {
               variant={currentTTSMode === 'google' ? 'default' : 'secondary'}
             >
               Managed voice
+            </Button>
+            <Button
+              onClick={() => handleTTSModeChanged('piper')}
+              variant={currentTTSMode === 'piper' ? 'default' : 'secondary'}
+            >
+              Piper (offline)
             </Button>
             <Button
               onClick={() => handleTTSModeChanged('browser')}

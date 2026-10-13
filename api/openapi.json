@@ -10560,7 +10560,7 @@
       "post": {
         "operationId": "postApiTts",
         "summary": "Synthesize speech",
-        "description": "Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs.",
+        "description": "Returns the audio as base64. Some language packs have no voice, and answer `404` with `noAudio`. Do not fall back to a browser voice for those packs. mode: piper uses the self-hosted Piper TTS engine (unmetered, uncached, no API key required); available when the language pack has a piperVoice configured.",
         "tags": [
           "Language help"
         ],
@@ -10580,7 +10580,12 @@
                     "description": "Speaking rate. The default is 0.9."
                   },
                   "language": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Language pack code."
+                  },
+                  "mode": {
+                    "type": "string",
+                    "description": "TTS engine: google, browser, or piper."
                   }
                 },
                 "required": [
@@ -11442,6 +11447,82 @@
           }
         ],
         "x-token-scope": "vocab:write"
+      }
+    },
+    "/api/vocab/by-text": {
+      "get": {
+        "operationId": "getApiVocabByText",
+        "summary": "Find vocab entry by text",
+        "description": "Find a vocabulary entry by its exact text content.",
+        "tags": [
+          "Vocabulary"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LanguageQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The matching entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VocabEntry"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The credential is missing, invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token does not carry the scope this endpoint needs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A plan limit or a rate limit stopped the call.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanLimitError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "The API failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "PersonalAccessToken": []
+          },
+          {
+            "SessionCookie": []
+          }
+        ],
+        "x-token-scope": "vocab:read"
       }
     },
     "/api/vocab/update-srs": {

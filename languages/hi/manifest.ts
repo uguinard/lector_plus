@@ -180,6 +180,7 @@ export const hi = {
   // Lowest-lettered Standard voice, and female, matching the tier and gender
   // af/de/es/pt/ru/pl use. Verified against Google's supported-voices list.
   ttsVoice: 'hi-IN-Standard-A',
+  piperVoice: 'hi_IN-puja-medium',
   tatoebaCode: 'hin',
   fallbackTts: ['hi', 'hi-IN'],
   avoidWords: AVOID_WORDS,

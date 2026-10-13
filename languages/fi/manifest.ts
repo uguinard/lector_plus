@@ -133,6 +133,7 @@ export const fi = {
   ttsCode: 'fi-FI',
   // fi-FI has one Standard voice. The issue names it.
   ttsVoice: 'fi-FI-Standard-B',
+  piperVoice: 'fi_FI-harri-medium',
   tatoebaCode: 'fin',
   fallbackTts: ['fi', 'fi-FI'],
   avoidWords: AVOID_WORDS,
