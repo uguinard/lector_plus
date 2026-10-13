@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getAllLanguages, LANGUAGES } from './registry';
+import { SUPERTONIC_LANGUAGE_CODES } from './types';
 
 // Pronunciation-capability conformance (#307 §3.2). The type system can't
 // express "ttsCode is required iff the pack declares the google engine", so
@@ -26,6 +27,29 @@ describe('registry pronunciation conformance', () => {
         expect(lang.ttsVoice, `${lang.code} needs ttsVoice for Google TTS`).toBeTruthy();
       }
     }
+  });
+
+  // The Supertonic engine lives in a sidecar and only reads 31 ISO codes. A
+  // pack that declares it must carry a supertonicLang drawn from that set, or
+  // the API would hand the engine a language it cannot read. zh is the guard
+  // case: Mandarin is NOT among the 31, so it must stay Google-only.
+  it('packs declaring supertonic carry a supported supertonicLang', () => {
+    const supported = new Set<string>(SUPERTONIC_LANGUAGE_CODES);
+    for (const lang of getAllLanguages()) {
+      const { audio } = lang.pronunciation;
+      if (audio === 'none' || !audio.includes('supertonic')) {
+        expect(
+          lang.supertonicLang,
+          `${lang.code} must not carry supertonicLang without declaring the engine`,
+        ).toBeUndefined();
+        continue;
+      }
+      expect(lang.supertonicLang, `${lang.code} needs supertonicLang`).toBeTruthy();
+      expect(supported.has(lang.supertonicLang!), `${lang.code} → ${lang.supertonicLang}`).toBe(
+        true,
+      );
+    }
+    expect(LANGUAGES.zh.pronunciation.audio).toEqual(['google']);
   });
 
   it('koine greek is audio-none with no voice fields (first no-audio pack)', () => {

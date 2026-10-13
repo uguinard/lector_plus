@@ -21,13 +21,13 @@ Optional local models run through the bundled Ollama service.
 
 Optional cloud models cover rare words and the tutor.
 
-| App | Host | Database | Anki |
-| --- | --- | --- | --- |
-| **Lector** | Lector Cloud, or one Compose file | SQLite | Two-way (beta) |
-| [LingQ](https://lector.dev/vs/lingq/) | Hosted only | Cloud | File export |
-| [Clozemaster](https://lector.dev/vs/clozemaster/) | Hosted only | Cloud | No documented export |
-| [Lute](https://lector.dev/vs/lute/) | pip, Docker, or source | Local files | One-way AnkiConnect |
-| [LinguaCafe](https://lector.dev/vs/linguacafe/) | Four Compose services | MySQL | One-way AnkiConnect |
+| App                                               | Host                              | Database    | Anki                 |
+| ------------------------------------------------- | --------------------------------- | ----------- | -------------------- |
+| **Lector**                                        | Lector Cloud, or one Compose file | SQLite      | Two-way (beta)       |
+| [LingQ](https://lector.dev/vs/lingq/)             | Hosted only                       | Cloud       | File export          |
+| [Clozemaster](https://lector.dev/vs/clozemaster/) | Hosted only                       | Cloud       | No documented export |
+| [Lute](https://lector.dev/vs/lute/)               | pip, Docker, or source            | Local files | One-way AnkiConnect  |
+| [LinguaCafe](https://lector.dev/vs/linguacafe/)   | Four Compose services             | MySQL       | One-way AnkiConnect  |
 
 Full pages live at [lector.dev/vs](https://lector.dev/vs/).
 
@@ -82,7 +82,7 @@ If you do not want to run a server, use the hosted app at [app.lector.dev](https
 - **Vocabulary review.** Review saved words with spaced repetition. Open Practice, then SRS Review. Select the levels to review. Or review only the words from one book. In the reader, select Review words.
 - **Anki.** The [Lector Sync add-on](https://ankiweb.net/shared/info/1098736891) on AnkiWeb is the recommended integration. The add-on code is `1098736891`. Cloud mode and a remote HTTPS self-host always use it. A local self-host can instead push cards to AnkiConnect on the computer that runs Anki. Reviews in Anki can update mastery in Lector.
 - **Tutor and journal.** Ask grammar questions in plain language. Write in the target language. The tutor returns corrections. Use the Claude API or a local model.
-- **Listen.** Optional text-to-speech (TTS). YouTube captions stay timestamped. A podcast upload can become a transcript and a listen-along lesson.
+- **Listen.** Optional text-to-speech (TTS). Voices come from Google, a local Supertonic engine (self-host), or your browser. YouTube captions stay timestamped. A podcast upload can become a transcript and a listen-along lesson.
 - **Data.** SQLite on your server. Export and restore from Settings. The self-host does not need a cloud account.
 
 ## Languages
@@ -146,18 +146,19 @@ Two transports exist. Open Settings, then Anki Integration, then Connection.
 
 If you want a file, copy `.env.example` to `.env`. Compose also reads the process environment.
 
-| Variable | Purpose |
-| --- | --- |
-| `ANTHROPIC_API_KEY` | Cloud translation and tutor. Optional. The local dictionary covers common words. |
-| `API_URL` | Browser-facing API origin. Required when the browser is not on the server. |
-| `LECTOR_MODE` | `selfhost` (default, one user, no login) or `cloud` (accounts). |
-| `LLM_PROVIDER` | `anthropic` (default) or an OpenAI-compatible backend. |
-| `OPENAI_COMPAT_URL` | Local model endpoint. The bundled Ollama service is `http://ollama:11434`. |
-| `CLASSIFY_WORKER` | Set to `1` to fill the fluency radar. Compose sets this for you. |
-| `DICT_LANGS` | Dictionaries to download at start. Use `all` for every language. Unset downloads only what you add in the picker. |
-| `DICT_FETCH` | Set to `0` to never download a dictionary. Use it with the `:full` image. |
-| `DICT_DIR` | Where the dictionaries live. The default is the `lector-dict` volume. |
-| `TRANSCRIBE_WORKER` | Set to `1` to transcribe podcast uploads. Needs a Whisper endpoint. See [`deploy/README.md`](deploy/README.md). |
+| Variable            | Purpose                                                                                                                                |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY` | Cloud translation and tutor. Optional. The local dictionary covers common words.                                                       |
+| `API_URL`           | Browser-facing API origin. Required when the browser is not on the server.                                                             |
+| `LECTOR_MODE`       | `selfhost` (default, one user, no login) or `cloud` (accounts).                                                                        |
+| `LLM_PROVIDER`      | `anthropic` (default) or an OpenAI-compatible backend.                                                                                 |
+| `OPENAI_COMPAT_URL` | Local model endpoint. The bundled Ollama service is `http://ollama:11434`.                                                             |
+| `SUPERTONIC_URL`    | Local neural TTS engine. Compose runs a `supertonic` sidecar and sets `http://supertonic:7788`. Unset uses Google/browser speech only. |
+| `CLASSIFY_WORKER`   | Set to `1` to fill the fluency radar. Compose sets this for you.                                                                       |
+| `DICT_LANGS`        | Dictionaries to download at start. Use `all` for every language. Unset downloads only what you add in the picker.                      |
+| `DICT_FETCH`        | Set to `0` to never download a dictionary. Use it with the `:full` image.                                                              |
+| `DICT_DIR`          | Where the dictionaries live. The default is the `lector-dict` volume.                                                                  |
+| `TRANSCRIBE_WORKER` | Set to `1` to transcribe podcast uploads. Needs a Whisper endpoint. See [`deploy/README.md`](deploy/README.md).                        |
 
 The app runs with no API keys. Claude is only required for rare words, phrase translation, and the tutor.
 

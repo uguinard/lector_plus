@@ -6,6 +6,16 @@ import { getCurrentUserId } from '../lib/user';
 import { getLanguageConfig } from '../lib/languages';
 import { entitlements, planLimitResponse, type UsageReservation } from '../lib/entitlements';
 import { getTtsCache, ttsCacheKey } from '../lib/tts-cache';
+<<<<<<< Updated upstream
+=======
+import {
+  synthesizeWithSupertonic,
+  isSupertonicAvailable,
+  isSupertonicConfigured,
+  getSupertonicError,
+  normalizeVoice,
+} from '../lib/supertonic';
+>>>>>>> Stashed changes
 
 const GOOGLE_TTS_URL = 'https://texttospeech.googleapis.com/v1/text:synthesize';
 const MAX_TTS_BODY_BYTES = 32 * 1024;
@@ -75,10 +85,18 @@ const app = new Hono();
 
 // POST /api/tts — synthesize speech, returned as base64. Dispatches on the
 // language pack's pronunciation capability (#307 §3.2): Google Cloud TTS for
+<<<<<<< Updated upstream
 // the national-language packs, self-hosted eSpeak NG for Esperanto, and an
 // explicit no-audio answer for `audio: 'none'` languages (disputed or
 // reconstructed pronunciation), which must NOT trigger the client's
 // browser-voice fallback.
+=======
+// the national-language packs, self-hosted eSpeak NG for Esperanto, a local
+// Supertonic sidecar for the languages that declare it (zero marginal cost, no
+// metering), and an explicit no-audio answer for `audio: 'none'` languages
+// (disputed or reconstructed pronunciation), which must NOT trigger the
+// client's browser-voice fallback.
+>>>>>>> Stashed changes
 app.post(
   '/',
   bodyLimit({
@@ -108,6 +126,7 @@ app.post(
         return c.json({ error: 'This language has no synthesized voice', noAudio: true }, 404);
       }
 
+<<<<<<< Updated upstream
       // Engine dispatch: packs declare their engines best-first. Today each
       // pack declares a single engine (national languages `['google']`, eo
       // `['espeak']`); the ordered-list form is the seam the §3.2c plan
@@ -119,6 +138,80 @@ app.post(
         // has no browser voice to fall back to, and mis-speaking in a
         // wrong-language voice is the failure mode this seam exists to kill.
         const rateNum = typeof rate === 'number' ? rate : 0.9;
+=======
+      const rateNum = typeof rate === 'number' ? rate : 0.9;
+
+      // Engine dispatch. The client sends `engine` for the engine it selected;
+      // when it is omitted, the pack's declared order decides (best-first:
+      // national languages ['google', 'supertonic'], eo ['espeak']).
+      const requestedEngine = engine as 'google' | 'supertonic' | 'espeak' | undefined;
+
+      // Supertonic path — served by a Python sidecar over HTTP. Unmetered on
+      // every tier (zero marginal cost, like eSpeak) and cached. Only the
+      // explicit request triggers it: the pack lists google first, so an
+      // omitted engine means google, and silently swapping engines would give
+      // the learner a voice they did not pick.
+      if (requestedEngine === 'supertonic' && audio.includes('supertonic')) {
+        if (!langConfig.supertonicLang) {
+          console.error(`Language "${lang}" declares supertonic but has no supertonicLang`);
+          return c.json(
+            { error: 'TTS voice not configured for this language', fallback: true },
+            503,
+          );
+        }
+
+        if (!(await isSupertonicAvailable())) {
+          // No `fallback: true` shortcut to a different server voice: the client
+          // asked for Supertonic explicitly, so tell it to use the browser.
+          console.warn(
+            isSupertonicConfigured()
+              ? `[tts] Supertonic unreachable: ${getSupertonicError()?.message ?? 'unknown error'}`
+              : '[tts] Supertonic not configured (SUPERTONIC_URL unset)',
+          );
+          return c.json({ error: 'Supertonic is unavailable', fallback: true }, 503);
+        }
+
+        const supertonicVoice = normalizeVoice(langConfig.supertonicVoice ?? voice);
+        // Cache key includes engine/voice so Supertonic output is separate from
+        // the Google render of the same text.
+        const cache = getTtsCache();
+        const cacheKey = ttsCacheKey({
+          language: lang,
+          voice: `supertonic:${langConfig.supertonicLang}:${supertonicVoice}`,
+          rate: rateNum,
+          text,
+        });
+        const hit = await cache.get(cacheKey);
+        if (hit) {
+          return c.json({
+            audioContent: Buffer.from(hit).toString('base64'),
+            contentType: 'audio/wav',
+            cached: true,
+          });
+        }
+
+        try {
+          const audioContent = await synthesizeWithSupertonic({
+            text,
+            lang: langConfig.supertonicLang,
+            voice: supertonicVoice,
+            rate: rateNum,
+          });
+          await cache.put(cacheKey, new Uint8Array(Buffer.from(audioContent, 'base64')));
+          return c.json({ audioContent, contentType: 'audio/wav' });
+        } catch (err) {
+          console.error('Supertonic TTS error:', err);
+          return c.json({ error: 'Speech synthesis failed', fallback: true }, 502);
+        }
+      }
+
+      // eSpeak path: unmetered on every tier (zero marginal cost — #307 §3.2c)
+      // and uncached (regenerating is cheaper than storing). On failure there
+      // is deliberately no `fallback: true` — an espeak-only language has no
+      // browser voice to fall back to, and mis-speaking in a wrong-language
+      // voice is the failure mode this seam exists to kill.
+      if (!audio.includes('google') && !audio.includes('supertonic')) {
+>>>>>>> Stashed changes
         try {
           const audioContent = await synthesizeWithEspeak(text, langConfig.code, rateNum);
           return c.json({ audioContent, contentType: 'audio/wav' });

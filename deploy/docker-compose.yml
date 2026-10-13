@@ -12,6 +12,42 @@ services:
     #       devices:
     #         - capabilities: [gpu]
 
+  supertonic:
+    # Local neural TTS engine (#307 §3.2c follow-on). It runs on onnxruntime,
+    # which ships only glibc wheels, so it cannot live in the Alpine app image.
+    # The model (~400 MB) downloads into the named volume on first start.
+    #
+    # Builds from an inline Dockerfile (Compose ≥ 2.24) so this server copy needs
+    # no extra files. Set SUPERTONIC_URL to something else, or remove this
+    # service, to run without local TTS — the app then uses Google/browser
+    # speech only. Point SUPERTONIC_URL at an external `supertonic serve` too.
+    image: lector-supertonic:latest
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.12-slim
+        RUN pip install --no-cache-dir 'supertonic[serve]'
+        EXPOSE 7788
+        CMD ["supertonic", "serve", "--host", "0.0.0.0", "--port", "7788"]
+    container_name: lector-supertonic
+    restart: unless-stopped
+    command: ['sh', '-c', 'supertonic download && exec supertonic serve --host 0.0.0.0 --port 7788']
+    volumes:
+      - supertonic-cache:/root/.cache
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7788/openapi.json').status==200 else 1)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # First start downloads the model before the engine serves.
+      start_period: 600s
+
   lector:
     # Pulled through registry.lector.dev, which counts pulls so we have a rough
     # idea how many installs exist. No IP address is stored — see
@@ -24,6 +60,7 @@ services:
     restart: unless-stopped
     depends_on:
       - ollama
+      - supertonic
     volumes:
       - ${DATA_PATH:-./data}:/app/data
       # On-device dictionaries (#438). The image ships none of them, so this
@@ -36,10 +73,10 @@ services:
       # one directory for everything.
       - lector-dict:/app/dict
     ports:
-      - "${WEB_PORT:-3400}:3000"
+      - '${WEB_PORT:-3400}:3000'
       # The Hono API is published on a fixed host :3457; the browser is told
       # where to reach it via API_URL below (which carries host + port).
-      - "3457:3457"
+      - '3457:3457'
     environment:
       - NODE_ENV=production
       - DATA_DIR=/app/data
@@ -57,6 +94,10 @@ services:
       - OPENAI_COMPAT_MODEL=${OPENAI_COMPAT_MODEL:-llama3.1:8b}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - CLAUDE_OAUTH_TOKEN=${CLAUDE_OAUTH_TOKEN:-}
+      # Local neural TTS sidecar (#307 §3.2c follow-on). Unset (or point it at an
+      # external `supertonic serve`) as needed. Unset/unreachable → the app uses
+      # Google/browser speech only.
+      - SUPERTONIC_URL=${SUPERTONIC_URL:-http://supertonic:7788}
       # Background word→domain classifier that feeds the fluency radar. The
       # code gate defaults OFF (so tests never fire LLM calls), so deployments
       # must opt in — without this the radar reads "pending classification"
@@ -79,7 +120,13 @@ services:
       # volume above. Both paths must agree.
       - DICT_DIR=${DICT_DIR:-/app/dict}
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -88,3 +135,4 @@ services:
 volumes:
   ollama-data:
   lector-dict:
+  supertonic-cache:

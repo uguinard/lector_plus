@@ -118,6 +118,19 @@ RUN bun install --frozen-lockfile --production
 
 COPY api/src ./src
 
+<<<<<<< Updated upstream
+=======
+# ── Bun API build stage ──
+FROM oven/bun:1-alpine AS api-builder
+
+WORKDIR /api
+
+COPY api/package.json api/bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+COPY api/src ./src
+
+>>>>>>> Stashed changes
 # ── Production stage ──
 FROM node:22-alpine AS runner
 
@@ -131,10 +144,20 @@ COPY --from=oven/bun:1-alpine /usr/local/bin/bun /usr/local/bin/bun
 # an arm's-length subprocess (api/src/routes/tts.ts); GPL obligations don't
 # attach because nothing GPL is distributed with, or linked into, Lector code.
 # ffmpeg supplies ffprobe for the audio-import duration probe (#185) — same
+<<<<<<< Updated upstream
 # arm's-length subprocess posture (api/src/lib/audio-probe.ts). Whisper itself
 # is deliberately NOT in this image: transcription talks to an external
 # OpenAI-compatible ASR server via ASR_URL (in-container Whisper would be
 # CPU-only inside Docker's VM — slow, and it pins the cores Lector shares).
+=======
+# arm's-length subprocess posture (api/src/lib/audio-probe.ts).
+# Supertonic (#307 §3.2c follow-on) is NOT here: it runs on onnxruntime, which
+# ships only glibc wheels, so it lives in the `supertonic` sidecar service
+# (defined in docker-compose.yml) reached over HTTP at SUPERTONIC_URL.
+# Whisper itself is deliberately NOT in this image: transcription talks to an
+# external OpenAI-compatible ASR server via ASR_URL (in-container Whisper would
+# be CPU-only inside Docker's VM — slow, and it pins the cores Lector shares).
+>>>>>>> Stashed changes
 RUN apk add --no-cache espeak-ng ffmpeg
 
 ENV NODE_ENV=production

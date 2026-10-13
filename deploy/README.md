@@ -23,17 +23,28 @@ docker compose up -d
 
 Compose injects environment variables at runtime. The image contains no secrets.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Optional | Enables AI translation for uncommon words |
-| `LECTOR_VERSION` | No | Image tag (default: `latest`). A pinned version carries no `v` prefix. Write `3.10.0`, not `v3.10.0`. The git tag keeps the prefix. The image tag drops it. |
-| `WEB_PORT` | No | Host port for the UI (default: `3400`) |
-| `API_URL` | **Remote** | Browser-facing API origin, for example `http://<host>:3457`. The API is published on host port 3457. The web app calls Hono directly, so the browser must reach it. Default `http://localhost:3457` is correct only on the host. |
-| `DATA_PATH` | No | Persistent data directory (default: `./data`) |
+| Variable            | Required   | Description                                                                                                                                                                                                                      |
+| ------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY` | Optional   | Enables AI translation for uncommon words                                                                                                                                                                                        |
+| `LECTOR_VERSION`    | No         | Image tag (default: `latest`). A pinned version carries no `v` prefix. Write `3.10.0`, not `v3.10.0`. The git tag keeps the prefix. The image tag drops it.                                                                      |
+| `WEB_PORT`          | No         | Host port for the UI (default: `3400`)                                                                                                                                                                                           |
+| `API_URL`           | **Remote** | Browser-facing API origin, for example `http://<host>:3457`. The API is published on host port 3457. The web app calls Hono directly, so the browser must reach it. Default `http://localhost:3457` is correct only on the host. |
+| `DATA_PATH`         | No         | Persistent data directory (default: `./data`)                                                                                                                                                                                    |
+| `SUPERTONIC_URL`    | No         | Local neural TTS engine. Compose builds and runs a `supertonic` sidecar and sets `http://supertonic:7788`. Unset uses Google/browser speech only.                                                                                |
 
 Root `docker-compose.yml` is the local path. This `deploy/docker-compose.yml` is the server path. Both pull `registry.lector.dev/lector`, which counts pulls so we have a rough idea how many installs exist. No IP address is stored — see the [privacy policy](https://lector.dev/privacy/).
 
 Both files also carry `ghcr.io/heuwels/lector` as a commented-out line. Swap which line is active to pull the identical image without being counted; nothing else about the install changes.
+
+## Text-to-speech engines
+
+Speech has three sources. Google Cloud TTS is the managed voice (paid cloud plans, or a self-host with `GOOGLE_CLOUD_API_KEY`). The browser voice is always free. The `supertonic` service is a local neural engine for 21 of the shipped languages.
+
+The sidecar is a Python image, built from the inline `Dockerfile` in the compose file (Docker Compose 2.24 or newer). It runs `supertonic serve` on port 7788. The API reaches it at `SUPERTONIC_URL`. Remove the `supertonic` service, or leave `SUPERTONIC_URL` empty, to run without it; the app then uses Google and browser speech only.
+
+The model is about 400 MB. It downloads into the `supertonic-cache` volume on the sidecar's first start, so the first start can take several minutes. Later starts are quick. The engine is unmetered on every plan: it runs on your own CPU, not on a paid API.
+
+Point `SUPERTONIC_URL` at another `supertonic serve` host to share one engine across boxes.
 
 For cloud mode, Anki, backups, and adoption of self-host data, see the root [README.md](../README.md).
 

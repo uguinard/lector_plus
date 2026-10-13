@@ -117,6 +117,13 @@ export const zh = {
   testPhrase: '你好！你好吗？',
   // Pinyin sits in the dictionary's `ipa` column (see the zh build profile), so
   // the reader can print it above each word (#289 4.4).
+<<<<<<< Updated upstream
+=======
+  //
+  // Google only. Supertonic-3 lists no Chinese among its 31 codes, so this pack
+  // must not declare it — a supertonicLang of 'zh' would be sent to an engine
+  // that cannot read it.
+>>>>>>> Stashed changes
   pronunciation: { audio: ['google'] as const, annotation: 'dictionary' as const },
   script: {
     // zh-Hans, not bare zh: it selects Simplified glyph forms and the

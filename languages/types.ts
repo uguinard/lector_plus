@@ -113,6 +113,49 @@ export interface ProseDefaults {
 export type TtsEngine = 'google' | 'espeak';
 
 /**
+ * Supertonic-3's supported ISO codes (#307 §3.2c follow-on). A pack's
+ * `supertonicLang` must be one of these; the engine reads no other language
+ * (its `na` fallback is not a target, so it is deliberately absent). Shared so
+ * the type system and the registry conformance test reject a pack that claims a
+ * language the engine cannot speak — Mandarin among them.
+ */
+export const SUPERTONIC_LANGUAGE_CODES = [
+  'en',
+  'ko',
+  'ja',
+  'ar',
+  'bg',
+  'cs',
+  'da',
+  'de',
+  'el',
+  'es',
+  'et',
+  'fi',
+  'fr',
+  'hi',
+  'hr',
+  'hu',
+  'id',
+  'it',
+  'lt',
+  'lv',
+  'nl',
+  'pl',
+  'pt',
+  'ro',
+  'ru',
+  'sk',
+  'sl',
+  'sv',
+  'tr',
+  'uk',
+  'vi',
+] as const;
+
+export type SupertonicLanguageCode = (typeof SUPERTONIC_LANGUAGE_CODES)[number];
+
+/**
  * Pronunciation capability (#307 §3.2) — two orthogonal axes, because a
  * language can have BOTH a synthesized voice and a phonetic gloss (Esperanto:
  * eSpeak audio + rule-generated IPA), which a single mode union can't express.
@@ -289,6 +332,17 @@ export interface LanguageConfig {
   ttsCode?: string;
   /** Preferred Google Cloud TTS voice. Required when 'google' ∈ pronunciation.audio. */
   ttsVoice?: string;
+<<<<<<< Updated upstream
+=======
+  /**
+   * Supertonic TTS language code (ISO 639-1). Required when 'supertonic' ∈
+   * pronunciation.audio; must be one of SUPERTONIC_LANGUAGE_CODES (enforced by
+   * the registry conformance test, since manifests are plain object literals).
+   */
+  supertonicLang?: string;
+  /** Preferred Supertonic voice (M1–M5, F1–F5). Required when 'supertonic' ∈ pronunciation.audio. */
+  supertonicVoice?: string;
+>>>>>>> Stashed changes
   /** Tatoeba 3-letter code, e.g. "deu". */
   tatoebaCode: string;
   /** Browser-TTS fallback locales, most-specific first. Only meaningful for 'google' languages. */

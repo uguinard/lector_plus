@@ -167,11 +167,32 @@ export default function TTSSettings() {
         ) : (
           googleTTSAvailable !== null && (
             <div className="flex items-center gap-2">
+<<<<<<< Updated upstream
               <span
                 className={`inline-block h-2 w-2 rounded-full ${
                   googleTTSAvailable ? 'bg-primary' : 'bg-yellow-500'
                 }`}
               />
+=======
+              {googleTTSAvailable !== null && (
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    googleTTSAvailable ? 'bg-primary' : 'bg-yellow-500'
+                  }`}
+                  title={googleTTSAvailable ? 'Google TTS available' : 'Google TTS not configured'}
+                />
+              )}
+              {supertonicSupported && (
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    supertonicAvailable ? 'bg-primary' : 'bg-yellow-500'
+                  }`}
+                  title={
+                    supertonicAvailable ? 'Supertonic available' : 'Supertonic models not loaded'
+                  }
+                />
+              )}
+>>>>>>> Stashed changes
               <span className="text-sm text-muted-foreground">
                 {managedTTSIncluded === false
                   ? 'Browser voice · Free'
@@ -204,7 +225,28 @@ export default function TTSSettings() {
               onClick={() => handleTTSModeChanged('google')}
               variant={currentTTSMode === 'google' ? 'default' : 'secondary'}
             >
+<<<<<<< Updated upstream
               Managed voice
+=======
+              Managed voice (Google)
+            </Button>
+            <Button
+              disabled={
+                !supertonicSupported || (supertonicSupported && supertonicAvailable === false)
+              }
+              onClick={() => handleTTSModeChanged('supertonic')}
+              variant={currentTTSMode === 'supertonic' ? 'default' : 'secondary'}
+              className={supertonicSupported && supertonicAvailable === false ? 'opacity-50' : ''}
+              title={
+                !supertonicSupported
+                  ? 'Supertonic not supported for this language'
+                  : supertonicAvailable === false
+                    ? 'Supertonic models not loaded on server — select to use browser voice fallback'
+                    : ''
+              }
+            >
+              Supertonic (Local AI)
+>>>>>>> Stashed changes
             </Button>
             <Button
               onClick={() => handleTTSModeChanged('browser')}
@@ -226,6 +268,42 @@ export default function TTSSettings() {
         </div>
       )}
 
+<<<<<<< Updated upstream
+=======
+      {currentTTSMode === 'supertonic' && supertonicSupported && (
+        <div>
+          {supertonicAvailable === false && (
+            <div className="mb-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-3 text-xs text-yellow-700 dark:text-yellow-300">
+              Supertonic is not reachable on this server, so speech falls back to your browser's
+              built-in voice.
+              <br />
+              <strong>To enable it,</strong> run the bundled{' '}
+              <code className="font-mono">supertonic</code> sidecar (see{' '}
+              <code className="font-mono">docker-compose.yml</code>) and make sure{' '}
+              <code className="font-mono">SUPERTONIC_URL</code> points at it. The model downloads on
+              the sidecar&apos;s first start.
+            </div>
+          )}
+          <label className="block text-sm font-medium text-foreground">Supertonic Voice</label>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Select a voice style for Supertonic TTS. All voices are included locally.
+          </p>
+          <select
+            value={selectedSupertonicVoice}
+            onChange={(e) => handleSupertonicVoiceChange(e.target.value as SupertonicVoiceId)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            data-testid="supertonic-voice-select"
+          >
+            {SUPERTONIC_VOICES.map((voice) => (
+              <option key={voice.id} value={voice.id}>
+                {voice.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+>>>>>>> Stashed changes
       {currentTTSMode === 'browser' && !espeakOnly && (
         <div>
           <div className="flex items-center justify-between">

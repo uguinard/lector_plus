@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-13 04:45
+
+- Rework Supertonic TTS from an unfinished in-process ONNX stub into an HTTP client for a bundled `supertonic serve` sidecar, and fix the model-fetch, language, and fallback defects found while tracing why the Settings button stayed disabled.
+  - `api/src/lib/supertonic.ts`: rewritten as an HTTP client against `SUPERTONIC_URL`. Readiness probe `GET /v1/styles` (cached 30 s), synthesis `POST /v1/tts` with `{text, voice, lang, steps, speed, response_format}`. Added `mapRateToSpeed` (neutral 1.0× → engine default 1.05, clamped 0.7–2.0), `normalizeVoice`, `isSupertonicConfigured`, `getSupertonicError`, `resetSupertonic`. Removed the `onnxruntime-node` session and the "not yet implemented" throw.
+  - `api/src/routes/tts.ts`: Supertonic branch is now async and runs only on an explicit `engine: 'supertonic'`; returns `fallback: true` (browser voice) when the sidecar is unavailable or synthesis fails, instead of silently swapping to Google. Caches the WAV under `supertonic:<lang>:<voice>`.
+  - `api/package.json`: dropped `onnxruntime-node` (no longer used; the engine is out-of-process).
+  - `Dockerfile`: removed the broken Hugging Face model stage, its `COPY`, and the `libgomp`/`libstdc++` packages added for the in-process runtime.
+  - `docker-compose.yml`, `deploy/docker-compose.yml`: added a `supertonic` sidecar (`python:3.12-slim`, `supertonic[serve]`, inline Dockerfile), a `supertonic-cache` volume, and `SUPERTONIC_URL=http://supertonic:7788`.
+  - `deploy/.env.example`: documented `SUPERTONIC_URL`.
+  - `languages/types.ts`: added the shared `SUPERTONIC_LANGUAGE_CODES` list plus `supertonicLang`/`supertonicVoice` on `LanguageConfig`.
+  - `languages/zh/manifest.ts`: removed Supertonic — Supertonic-3 has no Chinese among its 31 codes.
+  - `languages/registry.test.ts`: added a conformance test that a pack declaring `supertonic` carries a supported `supertonicLang`, and that `zh` stays Google-only.
+  - `src/app/settings/components/TTSSettings/index.tsx`: replaced the stale "models baked into the image" warning with sidecar/`SUPERTONIC_URL` guidance; the Supertonic button is enabled by pack support and dimmed only when the engine is unreachable.
+  - Tests: new `api/src/lib/supertonic.test.ts`; a Supertonic block in `api/src/routes/tts.test.ts` (reachable, unreachable, cache replay, unsupported language).
+  - Docs: `README.md` (Listen bullet, `SUPERTONIC_URL` row) and `deploy/README.md` (env row, new "Text-to-speech engines" section).
+- Bugs fixed along the way: the Dockerfile fetched `huggingface.co/supertone-inc/supertonic-3/onnx/model.onnx`, which does not exist (the model is four ONNX files across a different org); synthesis was a placeholder that always threw; and `zh` wrongly claimed a Supertonic voice.
+- Verified: client 1705 unit tests pass, API 1380 tests pass, Next build succeeds, Prettier clean. API `tsc` retains 7 pre-existing errors in `openapi/annotations.ts` and `routes/highlights.ts`, untouched here.
+
 ## 2026-10-12 16:10
 
 - Add tabbed settings page layout organizing 17 settings components into 6 logical tab groups.
